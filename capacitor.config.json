@@ -1,0 +1,10 @@
+{
+  "appId": "com.bethel.smart",
+  "appName": "بيثيل اسمارت",
+  "webDir": "www",
+  "android": {
+    "allowMixedContent": false,
+    "adjustMarginsForEdgeToEdge": "auto"
+  },
+  "backgroundColor": "#EDF2F6"
+}

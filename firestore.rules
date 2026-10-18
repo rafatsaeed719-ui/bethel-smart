@@ -1,0 +1,32 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signed() { return request.auth != null; }
+    function isOwner() { return signed() && request.auth.token.email == 'rafatsaeed719@gmail.com'; }
+    function me() { return get(/databases/$(database)/documents/users/$(request.auth.uid)).data; }
+    function coOn(c) { return get(/databases/$(database)/documents/companies/$(c)).data.active == true; }
+    function inCo(c) { return signed() && me().companyId == c && me().active != false && coOn(c); }
+    function isMgr(c) { return inCo(c) && me().role == 'manager'; }
+
+    match /config/{d} {
+      allow read: if signed();
+      allow write: if isOwner();
+    }
+    match /users/{u} {
+      allow read: if isOwner() || (signed() && request.auth.uid == u) || inCo(resource.data.companyId);
+      allow create: if isOwner() || (isMgr(request.resource.data.companyId) && request.resource.data.role in ['rep', 'acc']);
+      allow update: if isOwner()
+        || (isMgr(resource.data.companyId) && resource.data.role in ['rep', 'acc'] && request.resource.data.companyId == resource.data.companyId && request.resource.data.role == resource.data.role)
+        || (signed() && request.auth.uid == u && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['photo']));
+    }
+    match /companies/{c} {
+      allow read: if isOwner() || inCo(c);
+      allow write: if isOwner();
+      match /{col}/{d=**} {
+        allow read: if isOwner() || inCo(c);
+        allow write: if isOwner() || isMgr(c)
+          || (inCo(c) && col in ['visits', 'customers', 'invoices', 'orders', 'stock', 'plans', 'tasks', 'vacations']);
+      }
+    }
+  }
+}
