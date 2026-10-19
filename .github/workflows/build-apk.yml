@@ -49,3 +49,10 @@ jobs:
         run: |
           gh release delete latest --yes --cleanup-tag || true
           gh release create latest bethel-smart.apk --title "بيثيل اسمارت - آخر نسخة" --notes "اتبنت من commit ${GITHUB_SHA::7}"
+      - name: Publish web link (gh-pages)
+        run: |
+          rm -rf site && mkdir site && cp -r www/* site/ && cp bethel-smart.apk site/
+          touch site/.nojekyll
+          cd site && git init -q -b gh-pages && git add -A
+          git -c user.name="github-actions" -c user.email="actions@github.com" commit -qm "Web app ${GITHUB_SHA::7}"
+          git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" gh-pages
