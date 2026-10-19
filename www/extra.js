@@ -547,20 +547,20 @@ const teamFor=()=>(S.team||[]).filter(u=>u.id!==ME.uid&&u.id!==DV.rep);
 /* visit form: choose a partner */
 let DV={rep:null};
 const _drawVisit=drawVisit;
-drawVisit=function(){if(VF.with===undefined)VF.with=DV.rep?[ME.uid]:[];_drawVisit();const sh=document.querySelector('.sheet');if(!sh||!sh.querySelectorAll)return;
+drawVisit=function(){if(VF.with===undefined)VF.with=DV.rep&&DV.rep!==ME.uid?[ME.uid]:[];_drawVisit();const sh=document.querySelector('.sheet');if(!sh||!sh.querySelectorAll)return;
  const opts=teamFor();const anchor=[...sh.querySelectorAll('.f')].find(e=>/الأصناف/.test(e.textContent));if(!anchor)return;
- if(DV.rep){anchor.insertAdjacentHTML('beforebegin',`<div class="note" style="background:var(--accent-soft);color:var(--accent)">👥 دابل فيزت: انت و${esc(personName(DV.rep))}. الزيارة هتتحسب للاتنين.</div>`);return}
+if(DV.rep&&DV.rep!==ME.uid){anchor.insertAdjacentHTML('beforebegin',`<div class="note" style="background:var(--accent-soft);color:var(--accent)">👥 دابل فيزت: انت و${esc(personName(DV.rep))}. الزيارة هتتحسب للاتنين.</div>`);return}
  if(!opts.length)return;
  anchor.insertAdjacentHTML('beforebegin',`<div class="f">👥 دابل فيزت مع (اختياري)<div class="chips">${opts.map(u=>`<button class="chip ${VF.with.includes(u.id)?'on':''}" onclick="dvToggle('${u.id}')">${esc(u.name)}${u.role==='manager'?' (صاحب الشركة)':''}</button>`).join('')}</div>
   <div class="sub">الزيارة هتظهر في تقويم الاتنين وتتحسب في زيارات الاتنين.</div></div>`)};
 function dvToggle(id){VF.with.includes(id)?VF.with.splice(VF.with.indexOf(id),1):VF.with.push(id);drawVisit()}
 
 const _saveVisit2=saveVisit;
-saveVisit=function(){const before=new Set(S.visits.map(v=>v.id));const w=(VF.with||[]).slice(),cname=Cu(VF.cid).name,mgr=ME.role==='manager'&&DV.rep;
- const role0=V.role;if(mgr)V.role=DV.rep;
+saveVisit=function(){const before=new Set(S.visits.map(v=>v.id)),ob=new Set(S.orders.map(o=>o.id));const w=(VF.with||[]).slice(),cname=Cu(VF.cid).name,mgr=ME.role==='manager'&&DV.rep,solo=mgr&&DV.rep===ME.uid;
+ const role0=V.role;if(mgr&&!solo)V.role=DV.rep;
  try{_saveVisit2()}finally{if(mgr)V.role=role0}
  const v=S.visits.find(x=>!before.has(x.id));if(!v)return;
- v.cname=cname;if(w.length)v.with=w;if(mgr){v.rep=DV.rep;v.by=ME.uid;const o=S.orders.find(o=>o.cust===v.cust&&o.date===v.date&&o.rep===DV.rep&&!o.done);DV={rep:null};V.tab='dash'}
+ v.cname=cname;if(w.length)v.with=w;if(mgr){v.rep=DV.rep;v.by=ME.uid;S.orders.filter(o=>!ob.has(o.id)).forEach(o=>o.rep=DV.rep==ME.uid?(v.with||[])[0]||ME.uid:DV.rep);DV={rep:null};V.tab=solo?'mvisits':'dash';V.calSel=TODAY}
  render();if(w.length)toast('👥 اتسجلت دابل فيزت · ظهرت عند الاتنين')};
 
 /* company owner starts a double visit with a rep */
@@ -574,3 +574,23 @@ const _closeSheet2=closeSheet;
 closeSheet=function(){if(DV.rep&&!document.querySelector('#vt'))DV={rep:null};_closeSheet2()};
 const _dash3=VIEWS.dash;
 VIEWS.dash=()=>`<button class="btn big" onclick="dvStart()">👥 دابل فيزت مع مندوب</button>`+_dash3();
+
+
+/* ===================== زيارات صاحب الشركة ===================== */
+ICON.mvisits=ICON.visits;TILE.mvisits=TILE.visits;
+function mgrVisitStart(){if(!S.customers.length)return toast('ضيف صيدليات وعيادات الأول');
+ sheet(`<h3>📍 ابدأ زيارة</h3><div class="sub">الموقع بيتحسب من موبايلك. وتقدر تختار مندوب معاك جوه الزيارة لو هي دابل فيزت.</div>
+ <input id="mvQ" placeholder="ابحث باسم الصيدلية أو العيادة" oninput="mvList()"><div class="card"><div class="list" id="mvL"></div></div>`);mvList()}
+function mvList(){const q=($('#mvQ').value||'').trim();const cs=S.customers.filter(c=>!q||(c.name||'').includes(q)).sort((a,b)=>(a.name||'').localeCompare(b.name||'','ar'));
+ $('#mvL').innerHTML=cs.length?cs.map(c=>`<div class="item"><div class="grow"><div class="t">${esc(c.name)}</div><div class="d">${esc(c.type)} · ${esc(repName(c.addedBy))}${c.lat==null?' · من غير موقع':''}</div></div><button class="btn sm pri" onclick="DV={rep:ME.uid};geoCheck('${c.id}')">ابدأ</button></div>`).join(''):'<div class="empty">مفيش نتايج</div>'}
+VIEWS.mvisits=()=>{const all=allV().filter(v=>mine(v,ME.uid)).sort((a,b)=>(b.date+b.time).localeCompare(a.date+a.time));const month=all.filter(v=>v.date.startsWith(MONTH));
+ const days={};month.forEach(v=>(days[v.date]=days[v.date]||[]).push(v));const today=days[TODAY]||[];
+ return `<div class="row between nowrap"><div class="row nowrap">${tile('mvisits','lg')}<div><h2>زياراتي</h2><div class="sub">${fmt(month.length)} زيارة في ${mName(MONTH)} · النهارده ${fmt(today.length)}</div></div></div><button class="btn sm" onclick="go('dash')">رجوع</button></div>
+ <button class="btn pri big" onclick="mgrVisitStart()">${tile('visits')}ابدأ زيارة</button>
+ ${Object.keys(days).length?Object.entries(days).map(([d,vs])=>`<div class="card"><div class="row between"><h3>${d===TODAY?'النهارده':dt(d).toLocaleDateString('ar-EG',{weekday:'long',day:'numeric',month:'short'})}</h3><span class="pill">${fmt(vs.length)}</span></div><div class="list">${vs.map(v=>visitRow(v,v.rep!==ME.uid)).join('')}</div></div>`).join('')
+  :'<div class="empty">لسه ما عملتش زيارات الشهر ده</div>'}`};
+const _dash4=VIEWS.dash;
+VIEWS.dash=()=>{const n=allV().filter(v=>mine(v,ME.uid)&&v.date===TODAY).length;
+ return _dash4().replace(`<button class="btn big" onclick="dvStart()">👥 دابل فيزت مع مندوب</button>`,
+ `<button class="btn pri big" onclick="mgrVisitStart()">${tile('visits')}ابدأ زيارة</button>
+ <div class="grid2"><button class="btn" onclick="dvStart()">👥 دابل فيزت مع مندوب</button><button class="btn" onclick="go('mvisits')">📋 زياراتي${n?` (${fmt(n)} النهارده)`:''}</button></div>`)};
