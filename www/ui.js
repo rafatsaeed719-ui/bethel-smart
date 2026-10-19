@@ -763,14 +763,17 @@ function showLogin(msg){ME=null;document.body.classList.add('auth');closeSheet()
   <div class="card"><h2 style="text-align:center">${own?'أول مرة: حساب صاحب البرنامج':'تسجيل الدخول'}</h2>
    ${LOGIN.msg?`<div class="note bad">${esc(LOGIN.msg)}</div>`:''}
    <form id="lf" onsubmit="event.preventDefault();doLogin()" style="display:grid;gap:10px">
-    <label class="f">الإيميل<input id="le" type="email" dir="ltr" autocomplete="username" required value="${esc(LOGIN.email||'')}"></label>
-    <label class="f">كلمة السر<input id="lp" type="password" dir="ltr" autocomplete="${own?'new-password':'current-password'}" required minlength="6"></label>
+    <label class="f">الإيميل<input id="le" type="email" dir="ltr" autocomplete="username" autocapitalize="off" autocorrect="off" spellcheck="false" required value="${esc(LOGIN.email||'')}"></label>
+    <label class="f">كلمة السر<div class="row nowrap"><input id="lp" type="password" dir="ltr" autocomplete="${own?'new-password':'current-password'}" required minlength="6" autocapitalize="off" autocorrect="off" spellcheck="false"><button type="button" class="btn sm" onclick="const i=$('#lp');i.type=i.type==='password'?'text':'password';this.textContent=i.type==='password'?'إظهار':'إخفاء'">إظهار</button></div></label>
     <button class="btn pri big" id="lb" type="submit">${own?'إنشاء الحساب':'دخول'}</button></form>
    <div class="row between"><button class="btn sm" onclick="forgot()">نسيت كلمة السر</button>
     <button class="btn sm" onclick="LOGIN.mode=LOGIN.mode==='owner'?'in':'owner';LOGIN.msg='';LOGIN.email=$('#le').value;showLogin()">${own?'رجوع للدخول':'صاحب البرنامج؟'}</button></div></div></div>${sig()}`}
 async function doLogin(){const e=$('#le').value.trim().toLowerCase(),p=$('#lp').value;LOGIN.email=e;const b=$('#lb');b.disabled=true;b.textContent='لحظة...';
  try{if(LOGIN.mode==='owner'){if(e!==OWNER_EMAIL){b.disabled=false;b.textContent='إنشاء الحساب';return showLogin('الإيميل ده مش إيميل صاحب البرنامج')}await FB.signUp(e,p)}else await FB.signIn(e,p);LOGIN.msg=''}
- catch(err){showLogin(authErr(err))}}
+ catch(err){const c=err&&err.code||'';
+  if(LOGIN.mode==='in'&&e===OWNER_EMAIL&&/invalid-credential|wrong-password|user-not-found/.test(c)){LOGIN.mode='owner';return showLogin('لو دي أول مرة تدخل، اكتب كلمة سر جديدة ودوس "إنشاء الحساب". ولو عملت الحساب قبل كده ونسيت كلمة السر، دوس "نسيت كلمة السر".')}
+  if(LOGIN.mode==='owner'&&c==='auth/email-already-in-use'){LOGIN.mode='in';return showLogin('حسابك موجود فعلاً. ادخل بكلمة السر بتاعتك، ولو نسيتها دوس "نسيت كلمة السر" وهيوصلك لينك على الإيميل.')}
+  showLogin(authErr(err))}}
 function forgot(){const e=($('#le')&&$('#le').value.trim())||'';if(!e)return showLogin('اكتب الإيميل الأول، وبعدين دوس "نسيت كلمة السر"');
  FB.resetPassword(e).then(()=>showLogin('اتبعتلك لينك على الإيميل تغيّر منه كلمة السر')).catch(err=>showLogin(authErr(err)))}
 function logoutWith(msg){LOGIN.msg=msg;Sync.stop();FB.signOut()}
