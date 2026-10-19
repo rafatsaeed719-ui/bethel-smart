@@ -471,3 +471,63 @@ async function checkUpdate(){if(!window.FB||!FB.native||!window.APP_BUILD)return
   document.body.insertAdjacentHTML('beforeend',`<div class="upd" role="status"><div class="in"><div style="flex:1;min-width:0"><b>فيه نسخة جديدة من بيثيل اسمارت</b><div class="sub" style="font-size:12.5px">نزّلها وثبّتها فوق القديمة، بياناتك هتفضل زي ما هي.</div></div>
    <a class="btn acc sm" href="${APK_URL}" target="_blank" rel="noopener">تحديث</a><button class="btn sm" aria-label="إخفاء" onclick="try{sessionStorage.setItem('bs_upd_hide','${v.build}')}catch(e){};this.closest('.upd').remove()">✕</button></div></div>`)}catch(e){}}
 setTimeout(checkUpdate,4000);setInterval(checkUpdate,6*3600*1000);document.addEventListener('visibilitychange',()=>{if(!document.hidden)checkUpdate()});
+
+/* ===================== صاحب الشركة: الصيدليات والعيادات ===================== */
+ICON.mcust=ICON.customers;TILE.mcust=TILE.customers;
+let MC={q:'',rep:'all',type:'all'};
+function parseLoc(t){t=(t||'').trim();if(!t)return null;
+ const m=t.match(/@(-?\d{1,3}\.\d+),\s*(-?\d{1,3}\.\d+)/)||t.match(/[?&](?:q|query|ll|destination)=(-?\d{1,3}\.\d+)(?:,|%2C)\s*(-?\d{1,3}\.\d+)/i)||t.match(/!3d(-?\d{1,3}\.\d+)!4d(-?\d{1,3}\.\d+)/)||t.match(/(-?\d{1,3}\.\d{3,})\s*[,،]\s*(-?\d{1,3}\.\d{3,})/);
+ if(!m)return null;const lat=+m[1],lng=+m[2];if(Math.abs(lat)>90||Math.abs(lng)>180)return null;return {lat,lng}}
+const repName=id=>{const r=S.reps.find(x=>x.id===id);return r?r.name:'من غير مندوب'};
+VIEWS.mcust=()=>{let list=S.customers.slice();const total=list.length;
+ if(MC.rep!=='all')list=list.filter(c=>(c.addedBy||'')===(MC.rep==='none'?'':MC.rep)||(MC.rep==='none'&&!S.reps.some(r=>r.id===c.addedBy)));
+ if(MC.type!=='all')list=list.filter(c=>c.type===MC.type);if(MC.q)list=list.filter(c=>(c.name||'').includes(MC.q)||(c.phone||'').includes(MC.q));
+ list.sort((a,b)=>(a.name||'').localeCompare(b.name||'','ar'));const noLoc=S.customers.filter(c=>c.lat==null).length;
+ return `<div class="row between nowrap"><div class="row nowrap">${tile('mcust','lg')}<div><h2>الصيدليات والعيادات</h2><div class="sub">${fmt(total)} عميل${noLoc?` · ${fmt(noLoc)} من غير موقع`:''}</div></div></div><button class="btn sm" onclick="go('dash')">رجوع</button></div>
+ <button class="btn pri big" onclick="mcustForm()">+ إضافة صيدلية أو عيادة</button>
+ <input id="mcQ" placeholder="ابحث بالاسم أو التليفون" value="${esc(MC.q)}" oninput="MC.q=this.value;clearTimeout(window._mq);window._mq=setTimeout(()=>{render();const i=$('#mcQ');i.focus();i.setSelectionRange(99,99)},250)">
+ <div class="grid2"><select onchange="MC.rep=this.value;render()"><option value="all">كل المناديب</option>${S.reps.map(r=>`<option value="${r.id}" ${MC.rep===r.id?'selected':''}>${esc(r.name)}</option>`).join('')}<option value="none" ${MC.rep==='none'?'selected':''}>من غير مندوب</option></select>
+ <select onchange="MC.type=this.value;render()">${[['all','الكل'],['صيدلية','صيدليات'],['عيادة','عيادات']].map(([k,l])=>`<option value="${k}" ${MC.type===k?'selected':''}>${l}</option>`).join('')}</select></div>
+ <div class="card"><div class="list">${list.length?list.map(c=>`<div class="item"><div class="grow"><div class="row"><span class="t">${esc(c.name)}</span><span class="pill ${c.type==='عيادة'?'acc':''}">${esc(c.type)}</span>${c.lat==null?'<span class="pill warn">من غير موقع</span>':''}</div>
+  <div class="d">${esc(repName(c.addedBy))}${c.phone?` · <span dir="ltr">${esc(c.phone)}</span>`:''}${lastVisitOf(c.id)?' · آخر زيارة '+dFmt(lastVisitOf(c.id)):''}</div>${c.notes?`<div class="d">${esc(c.notes)}</div>`:''}
+  <div class="row" style="margin-top:6px"><button class="btn sm" onclick="mcustForm('${c.id}')">تعديل</button>${c.lat!=null?`<a class="btn sm" style="text-decoration:none" href="https://www.google.com/maps?q=${c.lat},${c.lng}" target="_blank" rel="noopener">🗺️ الخريطة</a>`:''}<button class="btn sm danger" onclick="askDelCust('${c.id}')">حذف</button></div></div></div>`).join(''):'<div class="empty">مفيش نتايج</div>'}</div></div>
+ <div class="note">العميل بيظهر عند المندوب اللي انت مختاره. لو العميل من غير موقع، المندوب يقدر يسجّل موقعه أول ما يكون عنده.</div>`};
+let MCF={};
+function mcustForm(id){const c=id?{...Cu(id)}:{type:'صيدلية',name:'',phone:'',notes:'',lat:null,lng:null,addedBy:(S.reps[0]||{}).id||''};MCF=c;
+ sheet(`<h3>${id?'تعديل بيانات العميل':'إضافة صيدلية أو عيادة'}</h3>
+ <div class="seg">${['صيدلية','عيادة'].map(t=>`<button class="${MCF.type===t?'on':''}" onclick="MCF.type='${t}';this.parentNode.querySelectorAll('button').forEach(b=>b.classList.toggle('on',b===this))">${t}</button>`).join('')}</div>
+ <label class="f">الاسم<input id="mcn" value="${esc(c.name)}" placeholder="صيدلية ... / عيادة د. ..."></label>
+ <label class="f">رقم التليفون<input id="mcp" inputmode="tel" dir="ltr" value="${esc(c.phone||'')}" placeholder="01xxxxxxxxx"></label>
+ <label class="f">المندوب المسؤول<select id="mcr">${S.reps.map(r=>`<option value="${r.id}" ${c.addedBy===r.id?'selected':''}>${esc(r.name)}</option>`).join('')}<option value="" ${!S.reps.some(r=>r.id===c.addedBy)?'selected':''}>من غير مندوب دلوقتي</option></select></label>
+ <label class="f">ملحوظات<textarea id="mcno" placeholder="مواعيد الزيارة، اسم الدكتور، طريقة الدفع...">${esc(c.notes||'')}</textarea></label>
+ <div class="card"><div class="row between"><h3>الموقع</h3><span class="pill ${c.lat!=null?'ok':'warn'}" id="mcLP">${c.lat!=null?'متسجل':'لسه'}</span></div>
+  <div class="sub num" id="mcLT">${c.lat!=null?`${c.lat.toFixed(5)}, ${c.lng.toFixed(5)}`:'اختار طريقة من التلاتة'}</div>
+  <button class="btn" id="mcLB" onclick="mcLocHere()">📍 موقعي الحالي (لو انت عند العميل)</button>
+  <label class="f">أو الصق لينك جوجل ماب أو الإحداثيات<input id="mcLI" dir="ltr" placeholder="27.18093, 31.18370" oninput="mcLocPaste(this.value)"></label>
+  <div class="sub">في جوجل ماب: دوس دوسة طويلة على مكان الصيدلية، هتظهر الأرقام فوق، انسخها والصقها هنا.</div>
+  <div class="sub">أو سيبه فاضي، والمندوب هيسجّله أول ما يروح.</div>
+  ${c.lat!=null?`<button class="btn sm danger" style="justify-self:start" onclick="MCF.lat=null;MCF.lng=null;$('#mcLT').textContent='الموقع اتشال';$('#mcLP').textContent='لسه';$('#mcLP').className='pill warn'">شيل الموقع</button>`:''}</div>
+ <button class="btn pri big" onclick="saveMcust('${id||''}')">حفظ</button>`)}
+function mcSetLoc(lat,lng,note){MCF.lat=lat;MCF.lng=lng;$('#mcLT').textContent=`${lat.toFixed(5)}, ${lng.toFixed(5)}`+(note?' · '+note:'');$('#mcLP').textContent='متسجل';$('#mcLP').className='pill ok'}
+async function mcLocHere(){const b=$('#mcLB');b.disabled=true;b.textContent='بنحدد موقعك...';await locate();b.disabled=false;b.textContent='📍 موقعي الحالي (لو انت عند العميل)';
+ if(!GEO.pos)return toast(GEO.err);mcSetLoc(GEO.pos.lat,GEO.pos.lng,'الدقة ± '+fmt(Math.round(GEO.pos.acc||0))+' متر')}
+function mcLocPaste(v){if(!v.trim())return;const p=parseLoc(v);if(p)mcSetLoc(p.lat,p.lng,'من اللينك');
+ else if(/goo\.gl|maps\.app/i.test(v))$('#mcLT').textContent='اللينك المختصر مش بيبيّن الموقع. افتحه في جوجل ماب وانسخ الأرقام (الإحداثيات) والصقها هنا.';
+ else $('#mcLT').textContent='مش لاقيين إحداثيات في اللي اتكتب'}
+function saveMcust(id){const name=$('#mcn').value.trim();if(!name)return toast('اكتب الاسم');
+ const d={type:MCF.type,name,phone:$('#mcp').value.trim(),notes:$('#mcno').value.trim(),addedBy:$('#mcr').value,lat:MCF.lat??null,lng:MCF.lng??null};
+ if(id)Object.assign(Cu(id),d);else S.customers.push({id:uid('c'),added:TODAY,by:'manager',...d});closeSheet();render();toast(id?'اتحدثت البيانات':'اتضاف العميل')}
+function askDelCust(id){const c=Cu(id);sheet(`<h3>حذف ${esc(c.name)}؟</h3><div class="sub">العميل هيختفي من عند المندوب. الزيارات والفواتير القديمة بتاعته هتفضل محفوظة.</div>
+ <button class="btn danger big" onclick="S.customers=S.customers.filter(x=>x.id!=='${id}');closeSheet();render();toast('اتحذف')">احذف</button><button class="btn" onclick="closeSheet()">رجوع</button>`)}
+
+/* entry points for the company owner */
+const _dash2=VIEWS.dash;
+VIEWS.dash=()=>{const n=S.customers.length,noLoc=S.customers.filter(c=>c.lat==null).length;
+ return `<button class="card" style="text-align:right;font:inherit;color:inherit;cursor:pointer" onclick="go('mcust')"><div class="row between nowrap"><div class="row nowrap">${tile('mcust')}<div><h3>الصيدليات والعيادات</h3><div class="sub">${fmt(n)} عميل${noLoc?` · ${fmt(noLoc)} من غير موقع`:''} · اضغط للإضافة والتعديل</div></div></div><span class="pill acc">+ إضافة</span></div></button>`+_dash2()};
+
+/* rep: customer without a location → record it on the spot */
+const _drawGeo=drawGeo;
+drawGeo=function(cid){_drawGeo(cid);const c=Cu(cid);if(c.lat!=null||!GEO.pos)return;const sh=document.querySelector('.sheet');if(!sh)return;
+ const b=[...sh.querySelectorAll('button.btn.big')].pop();
+ b.insertAdjacentHTML('beforebegin',`<button class="btn acc big" onclick="setCustLocHere('${cid}')">📍 سجّل موقع العميل من هنا (دقة ± ${fmt(Math.round(GEO.pos.acc||0))} متر)</button>`)};
+function setCustLocHere(cid){const c=Cu(cid);if(!GEO.pos)return;c.lat=GEO.pos.lat;c.lng=GEO.pos.lng;render();toast('اتسجل موقع العميل');drawGeo(cid)}
