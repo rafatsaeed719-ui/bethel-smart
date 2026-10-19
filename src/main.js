@@ -10,6 +10,8 @@ import { Geolocation } from '@capacitor/geolocation';
 import { Filesystem, Directory } from '@capacitor/filesystem';
 import { Share } from '@capacitor/share';
 import * as XLSX from 'xlsx';
+import html2canvas from 'html2canvas';
+import { jsPDF } from 'jspdf';
 import { firebaseConfig, OWNER_EMAIL } from './firebase-config.js';
 
 const app = initializeApp(firebaseConfig);
@@ -57,10 +59,29 @@ async function saveFile(filename, data) {
     await Share.share({ title: safe, files: [r.uri], dialogTitle: 'حفظ أو إرسال الملف' });
     return 'shared';
   }
-  const blob = new Blob([data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const ext = (filename.split('.').pop() || '').toLowerCase();
+  const mime = { pdf: 'application/pdf', xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }[ext] || 'application/octet-stream';
+  const blob = new Blob([data], { type: mime });
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = filename; a.click();
   setTimeout(() => URL.revokeObjectURL(a.href), 5000);
   return 'saved';
+}
+
+// Renders an element to an A4 PDF. Arabic text is drawn by the browser, so letters connect correctly.
+async function makePdf(el) {
+  const canvas = await html2canvas(el, { scale: 2, backgroundColor: '#ffffff', useCORS: true, logging: false });
+  const pdf = new jsPDF({ unit: 'pt', format: 'a4', compress: true });
+  const pw = pdf.internal.pageSize.getWidth(), ph = pdf.internal.pageSize.getHeight();
+  const sliceH = Math.floor(canvas.width * ph / pw);
+  for (let y = 0, page = 0; y < canvas.height; y += sliceH, page++) {
+    const h = Math.min(sliceH, canvas.height - y);
+    const part = document.createElement('canvas'); part.width = canvas.width; part.height = h;
+    const ctx = part.getContext('2d'); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, part.width, h);
+    ctx.drawImage(canvas, 0, y, canvas.width, h, 0, 0, canvas.width, h);
+    if (page) pdf.addPage();
+    pdf.addImage(part.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, pw, h * pw / canvas.width);
+  }
+  return pdf.output('arraybuffer');
 }
 
 window.XLSX = XLSX;
@@ -86,6 +107,6 @@ window.FB = {
   },
   batch: () => writeBatch(db),
   doc: (...p) => doc(db, ...p), col: (...p) => collection(db, ...p), query, where, orderBy, limitToLast, onSnapshot, setDoc, deleteDoc, updateDoc, getDoc, getDocs,
-  getPosition, saveFile
+  getPosition, saveFile, makePdf
 };
 window.dispatchEvent(new Event('fb-ready'));

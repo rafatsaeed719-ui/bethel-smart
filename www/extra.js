@@ -326,3 +326,84 @@ async function doPassAdmin(){const cur=PA.cur||($('#paC')?$('#paC').value.trim()
  try{await FB.adminSetPassword(PA.email,cur,nw);await FB.setDoc(FB.doc('secrets',PA.uid),{pass:nw,email:PA.email,at:Date.now()});credSheet(PA.who||'',PA.email,nw,'كلمة السر اتغيرت ✓')}
  catch(e){b.disabled=false;b.textContent='غيّر كلمة السر';const c=e&&e.code||'';
   toast(/invalid-credential|wrong-password/.test(c)?'كلمة السر الحالية المتسجلة مش صح. ابعتله لينك على الإيميل.':(c.startsWith('auth/')?authErr(e):Sync.fail(e)))}}
+
+/* ===================== فاتورة للطباعة / PDF باسم الشركة ===================== */
+const _start2=Sync.start;
+Sync.start=function(){_start2.call(this);if(ME.role==='owner')return;
+ this.on('brand',FB.doc('companies',ME.companyId,'settings','brand'),s=>{S.brand=s.exists()?s.data():{}})};
+
+function invoiceDocHTML(i){const b=S.brand||{},co=S.company||{},c=Cu(i.cust)||{},rep=R(i.rep)||{};
+ const gross=i.lines.reduce((s,l)=>s+l.qty*l.price,0),net=invTotal(i),ret=retValue(i),due=net-ret,st=invState(i);
+ const n2=v=>Number(v||0).toLocaleString('ar-EG',{minimumFractionDigits:2,maximumFractionDigits:2});
+ return `<div class="invdoc"><style>
+ .invdoc{width:760px;background:#fff;color:#14263b;font-family:"IBM Plex Sans Arabic",Tahoma,"Segoe UI",sans-serif;direction:rtl;padding:36px 40px;box-sizing:border-box;font-size:14px;line-height:1.6}
+ .invdoc *{box-sizing:border-box}
+ .invdoc .hd{display:flex;justify-content:space-between;align-items:flex-start;gap:20px;border-bottom:3px solid #0B2C55;padding-bottom:16px}
+ .invdoc .co{display:flex;gap:14px;align-items:center}.invdoc .co img{width:78px;height:78px;object-fit:contain;border-radius:10px}
+ .invdoc .co h1{margin:0;font-size:24px;color:#0B2C55;font-weight:700}.invdoc .co div{color:#5b6a7a;font-size:12.5px}
+ .invdoc .tag{text-align:left}.invdoc .tag b{display:block;font-size:22px;color:#00907C}.invdoc .tag span{display:block;color:#5b6a7a;font-size:13px}
+ .invdoc .meta{display:grid;grid-template-columns:1fr 1fr;gap:10px 28px;margin:18px 0;background:#f2f6f9;border-radius:10px;padding:14px 16px}
+ .invdoc .meta div{display:flex;justify-content:space-between;gap:10px}.invdoc .meta span{color:#5b6a7a}
+ .invdoc table{width:100%;border-collapse:collapse;margin-top:6px}
+ .invdoc th{background:#0B2C55;color:#fff;font-weight:600;padding:9px 8px;text-align:right;font-size:13px}
+ .invdoc td{padding:9px 8px;border-bottom:1px solid #dde4ea}.invdoc tr:nth-child(even) td{background:#f8fafb}
+ .invdoc .tot{width:330px;margin:16px 0 0 auto;margin-right:auto;margin-left:0}
+ .invdoc .tot div{display:flex;justify-content:space-between;padding:6px 4px;border-bottom:1px dashed #dde4ea}
+ .invdoc .tot .big{font-size:17px;font-weight:700;color:#0B2C55;border-bottom:0;background:#e6f5f1;border-radius:8px;padding:9px 10px;margin-top:4px}
+ .invdoc .st{display:inline-block;padding:3px 12px;border-radius:20px;font-weight:600;font-size:13px}
+ .invdoc .sign{display:flex;justify-content:space-between;margin-top:46px;color:#5b6a7a}.invdoc .sign div{width:40%;border-top:1px solid #9aa8b5;padding-top:6px;text-align:center}
+ .invdoc .foot{margin-top:26px;text-align:center;color:#5b6a7a;font-size:12.5px}
+ .invdoc .mark{display:flex;align-items:center;justify-content:center;gap:6px;margin-top:10px;color:#8796a5;font-size:11px}.invdoc .mark img{width:18px;height:18px}
+ </style>
+ <div class="hd"><div class="co">${b.logo?`<img src="${b.logo}" alt="">`:''}<div><h1>${esc(b.name||co.name||'')}</h1>
+  ${b.address?`<div>${esc(b.address)}</div>`:''}${b.phone||co.phone?`<div dir="ltr" style="text-align:right">${esc(b.phone||co.phone)}</div>`:''}${b.taxNo?`<div>رقم ضريبي: ${esc(b.taxNo)}</div>`:''}${b.crNo?`<div>سجل تجاري: ${esc(b.crNo)}</div>`:''}</div></div>
+  <div class="tag"><b>فاتورة مبيعات</b><span>رقم: ${esc(i.no)}</span><span>${dt(i.date).toLocaleDateString('ar-EG',{day:'numeric',month:'long',year:'numeric'})}</span></div></div>
+ <div class="meta"><div><span>العميل</span><b>${esc(c.name||'')}</b></div><div><span>المندوب</span><b>${esc(rep.name||'')}</b></div>
+  <div><span>تليفون العميل</span><b dir="ltr">${esc(c.phone||'—')}</b></div><div><span>حالة الفاتورة</span><b class="st" style="background:${st==='paid'?'#ddf2e5;color:#1c8a4c':st==='due'?'#fbe3e0;color:#c2362b':'#fbefd6;color:#a8690a'}">${STATUS_AR[st]}</b></div></div>
+ <table><thead><tr><th style="width:36px">#</th><th>الصنف</th><th>الكمية</th><th>السعر</th><th>الخصم</th><th>الإجمالي</th></tr></thead><tbody>
+ ${i.lines.map((l,k)=>`<tr><td>${fmt(k+1)}</td><td>${esc(P(l.prod).name)}</td><td>${fmt(l.qty)}</td><td>${n2(l.price)}</td><td>${fmt(l.disc||0)}٪</td><td><b>${n2(lineTotal(l))}</b></td></tr>`).join('')}
+ </tbody></table>
+ <div class="tot"><div><span>الإجمالي قبل الخصم</span><b>${n2(gross)}</b></div><div><span>الخصم</span><b>− ${n2(gross-net)}</b></div>
+  ${ret?`<div><span>مرتجع (${i.returns.map(r=>fmt(r.qty)+' '+esc(short(P(r.prod).name))).join('، ')})</span><b>− ${n2(ret)}</b></div>`:''}
+  <div class="big"><span>الصافي المطلوب</span><span>${n2(due)} جنيه</span></div>
+  ${st==='paid'?`<div><span>المحصّل (${dFmt(i.paidDate)})</span><b>${n2(i.collected)}</b></div>`:''}</div>
+ <div class="sign"><div>توقيع المندوب</div><div>توقيع واستلام العميل</div></div>
+ <div class="foot">${esc(b.footer||'شكراً لتعاملكم معنا')}</div>
+ <div class="mark"><img src="logo-mark.png" alt=""><span>صدرت من بيثيل اسمارت</span></div></div>`}
+
+async function invoicePdf(id,mode){const i=S.invoices.find(x=>x.id===id);if(!i)return;
+ if(mode==='print'&&!FB.native){const a=document.createElement('div');a.id='printArea';a.innerHTML=invoiceDocHTML(i);document.body.appendChild(a);document.body.classList.add('printing');
+  const done=()=>{document.body.classList.remove('printing');a.remove();window.removeEventListener('afterprint',done)};window.addEventListener('afterprint',done);
+  setTimeout(()=>{window.print();setTimeout(done,1500)},300);return}
+ toast('بنجهّز ملف الفاتورة...');
+ const box=document.createElement('div');box.style.cssText='position:fixed;left:-10000px;top:0;z-index:-1';box.innerHTML=invoiceDocHTML(i);document.body.appendChild(box);
+ try{await Promise.all([...box.querySelectorAll('img')].map(im=>im.complete?0:new Promise(r=>{im.onload=im.onerror=r})));
+  if(document.fonts&&document.fonts.ready)await document.fonts.ready;
+  const buf=await FB.makePdf(box.firstElementChild);const fn=`فاتورة-${i.no}-${(Cu(i.cust).name||'').replace(/\s+/g,'-')}.pdf`;
+  await FB.saveFile(fn,buf);if(mode==='print'&&FB.native)toast('اختار "طباعة" من القايمة، أو افتح الملف واطبعه')}
+ catch(e){if(!/cancel/i.test(String(e&&e.message)))toast('مقدرناش نعمل ملف الفاتورة')}finally{box.remove()}}
+
+const _invDetail=invDetail;
+invDetail=function(id){_invDetail(id);const sh=document.querySelector('.sheet');if(!sh)return;
+ sh.insertAdjacentHTML('beforeend',`<div class="grid2"><button class="btn acc" onclick="invoicePdf('${id}','share')">📤 إرسال PDF</button><button class="btn" onclick="invoicePdf('${id}','print')">🖨️ طباعة</button></div>
+ <button class="btn" onclick="sheet('<div style=&quot;overflow-x:auto&quot;><div style=&quot;zoom:.46&quot;>'+invoiceDocHTML(S.invoices.find(x=>x.id==='${id}'))+'</div></div><button class=&quot;btn&quot; onclick=&quot;invDetail(\\'${id}\\')&quot;>رجوع</button>')">👁️ شكل الفاتورة</button>`)};
+
+const _saveInv=saveInv;
+saveInv=function(){const before=new Set(S.invoices.map(x=>x.id));_saveInv();const n=S.invoices.find(x=>!before.has(x.id));if(n)setTimeout(()=>invDetail(n.id),250)};
+
+/* company letterhead for invoices (company owner) */
+let BR={};
+function brandForm(){const b=S.brand||{},co=S.company||{};BR={logo:b.logo||''};
+ sheet(`<h3>بيانات الفاتورة</h3><div class="sub">اللي هيظهر فوق كل فاتورة بيطبعها أي مندوب في الشركة.</div>
+ <div class="row nowrap"><div id="brL" style="width:72px;height:72px;border-radius:12px;border:1px solid var(--line);display:grid;place-items:center;background:#fff;overflow:hidden">${BR.logo?`<img src="${BR.logo}" alt="" style="max-width:100%;max-height:100%">`:'<span class="sub">لوجو</span>'}</div>
+  <div class="row"><label class="btn sm">${BR.logo?'تغيير اللوجو':'+ لوجو الشركة'}<input type="file" accept="image/*" hidden onchange="readImg(this,400,u=>{BR.logo=u;$('#brL').innerHTML='<img src='+u+' style=max-width:100%;max-height:100%>'})"></label>${BR.logo?`<button class="btn sm danger" onclick="BR.logo='';$('#brL').innerHTML='<span class=sub>لوجو</span>'">شيله</button>`:''}</div></div>
+ <label class="f">اسم الشركة على الفاتورة<input id="brN" value="${esc(b.name||co.name||'')}"></label>
+ <label class="f">العنوان<input id="brA" value="${esc(b.address||'')}"></label>
+ <label class="f">التليفون<input id="brP" dir="ltr" inputmode="tel" value="${esc(b.phone||co.phone||'')}"></label>
+ <div class="grid2"><label class="f">رقم ضريبي (اختياري)<input id="brT" value="${esc(b.taxNo||'')}"></label><label class="f">سجل تجاري (اختياري)<input id="brC" value="${esc(b.crNo||'')}"></label></div>
+ <label class="f">ملحوظة تحت الفاتورة<input id="brF" value="${esc(b.footer||'شكراً لتعاملكم معنا')}"></label>
+ <button class="btn pri big" onclick="saveBrand()">حفظ</button>`)}
+function saveBrand(){const d={logo:BR.logo||'',name:$('#brN').value.trim(),address:$('#brA').value.trim(),phone:$('#brP').value.trim(),taxNo:$('#brT').value.trim(),crNo:$('#brC').value.trim(),footer:$('#brF').value.trim()};
+ S.brand=d;FB.setDoc(FB.doc('companies',ME.companyId,'settings','brand'),d).then(()=>toast('اتحفظت بيانات الفاتورة')).catch(e=>Sync.fail(e));closeSheet()}
+const _rules=VIEWS.rules;
+VIEWS.rules=()=>`<div class="card"><div class="row between nowrap"><div class="row nowrap">${tile('invoices')}<div><h3>بيانات الفاتورة</h3><div class="sub">${S.brand&&S.brand.name?esc(S.brand.name)+(S.brand.logo?' · فيها لوجو':''):'اسم الشركة واللوجو والعنوان اللي بيطلعوا على الفاتورة المطبوعة'}</div></div></div><button class="btn sm" onclick="brandForm()">${S.brand&&S.brand.name?'تعديل':'إضافة'}</button></div></div>`+_rules();

@@ -240,6 +240,8 @@ body.auth main{padding-block:28px 40px}
 .chatbar textarea{min-height:46px;max-height:120px;resize:none}
 .brandfoot{display:flex;align-items:center;justify-content:center;gap:6px;color:var(--muted);font-size:12px;font-weight:600;padding-top:6px;opacity:.85}
 .brandfoot img{width:22px;height:22px;border-radius:6px;background:#fff;padding:2px}
+ #printArea{display:none}
+@media print{body.printing>*:not(#printArea){display:none!important}body.printing #printArea{display:block}body.printing{background:#fff}#printArea .invdoc{width:100%;padding:0}@page{size:A4;margin:12mm}}
 .welcome .hero{width:100%;max-height:280px;object-fit:cover;border-radius:14px;border:1px solid var(--line)}
 </style>
 </head>
