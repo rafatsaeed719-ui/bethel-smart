@@ -546,20 +546,21 @@ VIEWS.reps=()=>`<div class="row between"><h2>الموظفين</h2><button class=
   <div class="kv"><span>الإيميل</span><span class="num" dir="ltr">${esc(r.email)}</span></div>
   <div class="grid2"><label class="f">تارجت أسبوعي (ج)<input type="number" min="0" id="tw_${r.id}" value="${plan(r.id).targetWeek}" onchange="plan('${r.id}').targetWeek=+this.value||0;render();toast('اتحدد التارجت')"></label><label class="f">تارجت شهري (ج)<input type="number" min="0" id="tm_${r.id}" value="${plan(r.id).targetMonth}" onchange="plan('${r.id}').targetMonth=+this.value||0;render();toast('اتحدد التارجت')"></label></div>
   <div class="sub">الصلاحيات</div><div class="chips">${PERMS.map(([k,l])=>`<button class="chip ${(r.perms||{})[k]?'on':''}" aria-pressed="${!!(r.perms||{})[k]}" onclick="const x=R('${r.id}');x.perms={...(x.perms||{}),'${k}':!(x.perms||{})['${k}']};render()">${(r.perms||{})[k]?'✓ ':''}${l}</button>`).join('')}</div>
-  <div class="row"><button class="btn sm pri" onclick="empProfile('${r.id}')">ساعات الشغل</button><button class="btn sm" onclick="openChat('${ME.companyId}','${r.id}')">💬 شات ${typeof unread==='function'&&unread(S.threads&&S.threads[r.id])?'<span class="dotn">جديد</span>':''}</button><button class="btn sm" onclick="sendReset('${esc(r.email)}')">لينك كلمة السر</button><button class="btn sm danger" onclick="askDeactivate('${r.id}')">إيقاف الحساب</button></div></div>`).join('')||'<div class="empty">لسه مفيش مناديب. دوس "+ حساب مندوب" علشان تعمل أول حساب.</div>'}
+  <div class="row"><button class="btn sm pri" onclick="empProfile('${r.id}')">ساعات الشغل</button><button class="btn sm" onclick="openChat('${ME.companyId}','${r.id}')">💬 شات ${typeof unread==='function'&&unread(S.threads&&S.threads[r.id])?'<span class="dotn">جديد</span>':''}</button><button class="btn sm" onclick="passAdmin('${r.id}')">🔑 كلمة السر</button><button class="btn sm danger" onclick="askDeactivate('${r.id}')">إيقاف الحساب</button></div></div>`).join('')||'<div class="empty">لسه مفيش مناديب. دوس "+ حساب مندوب" علشان تعمل أول حساب.</div>'}
  <div class="note">كل مندوب بيدخل بالإيميل وكلمة السر اللي انت بتبعتهاله، وبيشوف عملاءه وفواتيره ومخزنه بس حسب صلاحياته. وكل موظف يقدر يحط صورته من صفحة "حسابي".</div>
  ${accSection()}`;
-function repForm(){const pw=Math.random().toString(36).slice(2,8);
+function repForm(){const pw=String(Math.floor(100000+Math.random()*900000));
  sheet(`<h3>حساب مندوب جديد</h3><label class="f">الاسم<input id="rn"></label><label class="f">المنطقة<input id="ra" placeholder="أسيوط - ..."></label>
- <label class="f">الإيميل<input id="re" dir="ltr" placeholder="name@nilepharma.app"></label><label class="f">كلمة السر<input id="rp" dir="ltr" value="${pw}"></label>
+ <label class="f">الإيميل<input id="re" dir="ltr" placeholder="name@nilepharma.app"></label><label class="f">كلمة السر<input id="rp" dir="ltr" inputmode="text" autocapitalize="off" autocorrect="off" spellcheck="false" value="${pw}"></label>
  <div class="grid2"><label class="f">رصيد الأجازات (يوم)<input type="number" id="rv" value="21"></label><label class="f">خصم يوم الغياب<select id="rd">${DEDUCT_OPTS.map(x=>`<option value="${x}" ${x===1?'selected':''}>${DLBL(x)}</option>`).join('')}</select></label></div>
  <button class="btn pri big" onclick="addRep()">إنشاء الحساب</button>`)}
-async function addRep(){const n=$('#rn').value.trim(),e=$('#re').value.trim().toLowerCase(),p=$('#rp').value;if(!n||!e)return toast('اكتب الاسم والإيميل');if(p.length<6)return toast('كلمة السر لازم ٦ حروف على الأقل');
+async function addRep(){const n=$('#rn').value.trim(),e=$('#re').value.trim().toLowerCase(),p=$('#rp').value.trim();if(!n||!e)return toast('اكتب الاسم والإيميل');if(p.length<6)return toast('كلمة السر لازم ٦ حروف على الأقل');
  const b=document.querySelector('.sheet .btn.big');b.disabled=true;b.textContent='بنعمل الحساب...';
- try{const id=await FB.createUser(e,p);S.reps.push({id,role:'rep',companyId:ME.companyId,active:true,name:n,area:$('#ra').value.trim()||'—',email:e,photo:'',vacBalance:+$('#rv').value||0,absenceDeduct:+$('#rd').value,perms:{addCust:true,editCust:true,invoices:true,returns:false}});
+ try{const id=await FB.createUser(e,p);const doc={role:'rep',companyId:ME.companyId,active:true,name:n,area:$('#ra').value.trim()||'—',email:e,photo:'',vacBalance:+$('#rv').value||0,absenceDeduct:+$('#rd').value,perms:{addCust:true,editCust:true,invoices:true,returns:false}};
+  await FB.setDoc(FB.doc('users',id),doc);await FB.setDoc(FB.doc('secrets',id),{pass:p,email:e,at:Date.now()}).catch(()=>{});S.reps.push({id,...doc});
   render();credSheet(n,e,p)}catch(err){b.disabled=false;b.textContent='إنشاء الحساب';toast(authErr(err))}}
-function credSheet(n,e,p){const txt=`أهلاً ${n}\nده حسابك على بيثيل اسمارت:\nالإيميل: ${e}\nكلمة السر: ${p}`;window._cred=txt;
- sheet(`<h3>الحساب اتعمل ✓</h3><div class="sub">ابعت البيانات دي للموظف علشان يدخل بيها. كلمة السر مش هتظهر تاني.</div>
+function credSheet(n,e,p,title){const txt=`أهلاً ${n}\nده حسابك على بيثيل اسمارت:\nالإيميل: ${e}\nكلمة السر: ${p}`;window._cred=txt;
+ sheet(`<h3>${title||'الحساب اتعمل ✓'}</h3><div class="sub">ابعت البيانات دي لصاحبها علشان يدخل بيها. وتقدر تشوف كلمة السر أو تغيّرها في أي وقت من زرار 🔑 كلمة السر.</div>
  <div class="card"><div class="kv"><span>الاسم</span><b>${esc(n)}</b></div><div class="kv"><span>الإيميل</span><b dir="ltr">${esc(e)}</b></div><div class="kv"><span>كلمة السر</span><b dir="ltr">${esc(p)}</b></div></div>
  <button class="btn pri big" onclick="copyCred()">نسخ البيانات</button><button class="btn" onclick="closeSheet()">تمام</button>`)}
 function copyCred(){const t=window._cred||'';(navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(()=>toast('اتنسخت · ابعتها للموظف')).catch(()=>toast('انسخها بإيدك من فوق'))}
@@ -741,15 +742,16 @@ function accSection(){return `<div class="row between" style="margin-top:6px"><d
  ${S.accountants.map(a=>`<div class="card"><div class="row nowrap">${avatar(a)}<h3>${esc(a.name)}</h3><span class="pill acc">حسابات</span></div>
   <div class="kv"><span>الإيميل</span><span class="num" dir="ltr">${esc(a.email)}</span></div>
   <div class="sub">يقدر ينزّل</div><div class="chips">${APERMS.map(([k,l])=>`<button class="chip ${(a.perms||{})[k]?'on':''}" aria-pressed="${!!(a.perms||{})[k]}" onclick="const x=Acc('${a.id}');x.perms={...(x.perms||{}),'${k}':!(x.perms||{})['${k}']};render()">${(a.perms||{})[k]?'✓ ':''}${l}</button>`).join('')}</div>
-  <div class="row"><button class="btn sm" onclick="openChat('${ME.companyId}','${a.id}')">💬 شات ${typeof unread==='function'&&unread(S.threads&&S.threads[a.id])?'<span class="dotn">جديد</span>':''}</button><button class="btn sm" onclick="sendReset('${esc(a.email)}')">لينك تغيير كلمة السر</button><button class="btn sm danger" onclick="askDeactivate('${a.id}')">إيقاف الحساب</button></div></div>`).join('')||'<div class="empty">مفيش موظفين حسابات</div>'}
+  <div class="row"><button class="btn sm" onclick="openChat('${ME.companyId}','${a.id}')">💬 شات ${typeof unread==='function'&&unread(S.threads&&S.threads[a.id])?'<span class="dotn">جديد</span>':''}</button><button class="btn sm" onclick="passAdmin('${a.id}')">🔑 كلمة السر</button><button class="btn sm danger" onclick="askDeactivate('${a.id}')">إيقاف الحساب</button></div></div>`).join('')||'<div class="empty">مفيش موظفين حسابات</div>'}
  <div class="note">موظف الحسابات بيشوف الفواتير وصفحة التقارير بس، وبينزّل الملفات اللي انت مدّيله صلاحيتها.</div>`}
-function accForm(){const pw=Math.random().toString(36).slice(2,8);
- sheet(`<h3>موظف حسابات جديد</h3><label class="f">الاسم<input id="an"></label><label class="f">الإيميل<input id="ae" dir="ltr" placeholder="name@nilepharma.app"></label><label class="f">كلمة السر<input id="ap" dir="ltr" value="${pw}"></label>
+function accForm(){const pw=String(Math.floor(100000+Math.random()*900000));
+ sheet(`<h3>موظف حسابات جديد</h3><label class="f">الاسم<input id="an"></label><label class="f">الإيميل<input id="ae" dir="ltr" placeholder="name@nilepharma.app"></label><label class="f">كلمة السر<input id="ap" dir="ltr" autocapitalize="off" autocorrect="off" spellcheck="false" value="${pw}"></label>
  <div class="f">الصلاحيات<div class="chips">${APERMS.map(([k,l])=>`<label class="chip" style="display:inline-flex;gap:6px;align-items:center"><input type="checkbox" id="ap_${k}" checked style="width:16px;height:16px;margin:0">${l}</label>`).join('')}</div></div>
  <button class="btn pri big" onclick="addAcc()">إنشاء الحساب</button>`)}
-async function addAcc(){const n=$('#an').value.trim(),e=$('#ae').value.trim().toLowerCase(),p=$('#ap').value;if(!n||!e)return toast('اكتب الاسم والإيميل');if(p.length<6)return toast('كلمة السر لازم ٦ حروف على الأقل');
+async function addAcc(){const n=$('#an').value.trim(),e=$('#ae').value.trim().toLowerCase(),p=$('#ap').value.trim();if(!n||!e)return toast('اكتب الاسم والإيميل');if(p.length<6)return toast('كلمة السر لازم ٦ حروف على الأقل');
  const perms=Object.fromEntries(APERMS.map(([k])=>[k,$('#ap_'+k).checked]));const b=document.querySelector('.sheet .btn.big');b.disabled=true;b.textContent='بنعمل الحساب...';
- try{const id=await FB.createUser(e,p);S.accountants.push({id,role:'acc',companyId:ME.companyId,active:true,name:n,email:e,photo:'',perms});render();credSheet(n,e,p)}
+ try{const id=await FB.createUser(e,p);const doc={role:'acc',companyId:ME.companyId,active:true,name:n,email:e,photo:'',perms};
+  await FB.setDoc(FB.doc('users',id),doc);await FB.setDoc(FB.doc('secrets',id),{pass:p,email:e,at:Date.now()}).catch(()=>{});S.accountants.push({id,...doc});render();credSheet(n,e,p)}
  catch(err){b.disabled=false;b.textContent='إنشاء الحساب';toast(authErr(err))}}
 
 
@@ -768,7 +770,7 @@ function showLogin(msg){ME=null;document.body.classList.add('auth');closeSheet()
     <button class="btn pri big" id="lb" type="submit">${own?'إنشاء الحساب':'دخول'}</button></form>
    <div class="row between"><button class="btn sm" onclick="forgot()">نسيت كلمة السر</button>
     <button class="btn sm" onclick="LOGIN.mode=LOGIN.mode==='owner'?'in':'owner';LOGIN.msg='';LOGIN.email=$('#le').value;showLogin()">${own?'رجوع للدخول':'صاحب البرنامج؟'}</button></div></div></div>${sig()}`}
-async function doLogin(){const e=$('#le').value.trim().toLowerCase(),p=$('#lp').value;LOGIN.email=e;const b=$('#lb');b.disabled=true;b.textContent='لحظة...';
+async function doLogin(){const e=$('#le').value.trim().toLowerCase(),p=$('#lp').value.trim();LOGIN.email=e;const b=$('#lb');b.disabled=true;b.textContent='لحظة...';
  try{if(LOGIN.mode==='owner'){if(e!==OWNER_EMAIL){b.disabled=false;b.textContent='إنشاء الحساب';return showLogin('الإيميل ده مش إيميل صاحب البرنامج')}await FB.signUp(e,p)}else await FB.signIn(e,p);LOGIN.msg=''}
  catch(err){const c=err&&err.code||'';
   if(LOGIN.mode==='in'&&e===OWNER_EMAIL&&/invalid-credential|wrong-password|user-not-found/.test(c)){LOGIN.mode='owner';return showLogin('لو دي أول مرة تدخل، اكتب كلمة سر جديدة ودوس "إنشاء الحساب". ولو عملت الحساب قبل كده ونسيت كلمة السر، دوس "نسيت كلمة السر".')}

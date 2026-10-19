@@ -12,6 +12,10 @@ service cloud.firestore {
       allow read: if signed();
       allow write: if isOwner();
     }
+    match /secrets/{u} {
+      allow read, write: if isOwner() || (signed() && request.auth.uid == u)
+        || (get(/databases/$(database)/documents/users/$(u)).data.role in ['rep', 'acc'] && isMgr(get(/databases/$(database)/documents/users/$(u)).data.companyId));
+    }
     match /config/{d} {
       allow read: if signed();
       allow write: if isOwner();

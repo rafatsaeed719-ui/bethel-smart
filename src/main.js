@@ -80,6 +80,10 @@ window.FB = {
     await reauthenticateWithCredential(u, EmailAuthProvider.credential(u.email, current));
     await updatePassword(u, next);
   },
+  async adminSetPassword(email, current, next) {
+    const c = await signInWithEmailAndPassword(helperAuth, email, current);
+    try { await updatePassword(c.user, next); } finally { await signOut(helperAuth); }
+  },
   batch: () => writeBatch(db),
   doc: (...p) => doc(db, ...p), col: (...p) => collection(db, ...p), query, where, orderBy, limitToLast, onSnapshot, setDoc, deleteDoc, updateDoc, getDoc, getDocs,
   getPosition, saveFile

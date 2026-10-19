@@ -92,8 +92,8 @@ function passForm(){sheet(`<h3>تغيير كلمة السر</h3>
  <label class="f">كلمة السر الجديدة<input id="pn1" type="password" dir="ltr" autocomplete="new-password" minlength="6"></label>
  <label class="f">اكتب الجديدة تاني<input id="pn2" type="password" dir="ltr" autocomplete="new-password"></label>
  <button class="btn pri big" id="pcb" onclick="doPass()">غيّر كلمة السر</button>`)}
-async function doPass(){const c=$('#pc').value,a=$('#pn1').value,b=$('#pn2').value;if(a.length<6)return toast('كلمة السر لازم ٦ حروف على الأقل');if(a!==b)return toast('الكلمتين مش زي بعض');
- const btn=$('#pcb');btn.disabled=true;try{await FB.changePassword(c,a);closeSheet();toast('اتغيرت كلمة السر')}catch(e){btn.disabled=false;toast(authErr(e))}}
+async function doPass(){const c=$('#pc').value.trim(),a=$('#pn1').value.trim(),b=$('#pn2').value.trim();if(a.length<6)return toast('كلمة السر لازم ٦ حروف على الأقل');if(a!==b)return toast('الكلمتين مش زي بعض');
+ const btn=$('#pcb');btn.disabled=true;try{await FB.changePassword(c,a);if(ME.role!=='owner')FB.setDoc(FB.doc('secrets',ME.uid),{pass:a,email:ME.email,at:Date.now()}).catch(()=>{});closeSheet();toast('اتغيرت كلمة السر')}catch(e){btn.disabled=false;toast(authErr(e))}}
 userMenu=function(){if(!ME)return;const q=typeof myQueue==='function'&&ME.role==='rep'?myQueue().length:0;const p=S.profile||{};
  const roleAr={owner:'صاحب البرنامج',manager:'صاحب الشركة',rep:'مندوب',acc:'موظف حسابات'}[ME.role];
  sheet(`<div class="row nowrap">${avatar({name:myName(),photo:p.photo},'lg')}<div style="min-width:0"><h3>${esc(myName())}</h3><div class="sub">${roleAr}${S.company&&ME.role!=='owner'?' · '+esc(S.company.name):''}</div><div class="sub" dir="ltr" style="text-align:right">${esc(ME.email)}</div></div></div>
@@ -193,21 +193,23 @@ VIEWS.companies=()=>{const list=S.companies.filter(c=>!c.deleted).sort((a,b)=>(b
   <div class="grid2"><button class="btn pri" onclick="openChat('${c.id}','owner')">${tile('chat')}شات ${unread(t)?'<span class="dotn">جديد</span>':''}</button><button class="btn" onclick="editCompany('${c.id}')">✏️ تعديل والاشتراك</button></div>
   <div class="row"><button class="btn sm" onclick="warnCompany('${c.id}')">⚠️ إنذار بالدفع</button>
    <button class="btn sm ${c.active?'danger':'okb'}" onclick="toggleCompany('${c.id}')">${c.active?'إيقاف لحين الدفع':'تشغيل تاني'}</button>
+   <button class="btn sm" onclick="passAdmin('${c.managerUid}','${c.id}')">🔑 كلمة السر</button>
    <button class="btn sm danger" onclick="askDeleteCompany('${c.id}')">حذف</button></div></div>`}).join('')||'<div class="empty">لسه مفيش شركات. دوس "+ شركة" علشان تعمل أول نسخة.</div>'}
  <div class="note">الإيقاف بيقفل البرنامج على الشركة وكل موظفينها، والبيانات بتفضل محفوظة لحد ما تشغّلها تاني.</div>`};
 const planFields=c=>`<div class="grid2"><label class="f">نوع الاشتراك<select id="cpl" onchange="$('#cpuW').hidden=this.value==='lifetime'">${Object.entries(PLAN_AR).map(([k,l])=>`<option value="${k}" ${(c.plan||'monthly')===k?'selected':''}>${l}</option>`).join('')}</select></label>
  <label class="f" id="cpuW" ${c.plan==='lifetime'?'hidden':''}>مدفوع لحد<input type="date" id="cpu" value="${c.paidUntil||addDays(TODAY,30)}"></label></div>`;
-coForm=function(){const pw=Math.random().toString(36).slice(2,10);
+coForm=function(){const pw=String(Math.floor(100000+Math.random()*900000));
  sheet(`<h3>شركة جديدة</h3><label class="f">اسم الشركة<input id="con"></label><label class="f">اسم صاحب الشركة<input id="com"></label>
  <label class="f">رقم التليفون<input id="cph" inputmode="tel" dir="ltr" placeholder="01xxxxxxxxx"></label>
- <label class="f">الإيميل<input id="coe" dir="ltr" type="email" autocapitalize="off"></label><label class="f">كلمة السر<input id="cop" dir="ltr" value="${pw}"></label>
+ <label class="f">الإيميل<input id="coe" dir="ltr" type="email" autocapitalize="off"></label><label class="f">كلمة السر<input id="cop" dir="ltr" autocapitalize="off" autocorrect="off" spellcheck="false" value="${pw}"></label>
  ${planFields({})}<button class="btn pri big" onclick="addCompany()">إنشاء الحساب</button>`)};
-addCompany=async function(){const n=$('#con').value.trim(),m=$('#com').value.trim(),e=$('#coe').value.trim().toLowerCase(),p=$('#cop').value,ph=$('#cph').value.trim(),plan=$('#cpl').value,pu=plan==='lifetime'?'':$('#cpu').value;
+addCompany=async function(){const n=$('#con').value.trim(),m=$('#com').value.trim(),e=$('#coe').value.trim().toLowerCase(),p=$('#cop').value.trim(),ph=$('#cph').value.trim(),plan=$('#cpl').value,pu=plan==='lifetime'?'':$('#cpu').value;
  if(!n||!e)return toast('اكتب اسم الشركة والإيميل');if(p.length<6)return toast('كلمة السر لازم ٦ حروف على الأقل');
  const b=document.querySelector('.sheet .btn.big');b.disabled=true;b.textContent='بنعمل النسخة...';
  try{const muid=await FB.createUser(e,p);const cid='co'+Date.now().toString(36);
   await FB.setDoc(FB.doc('companies',cid),{name:n,manager:m,phone:ph,email:e,active:true,since:TODAY,managerUid:muid,plan,paidUntil:pu});
   await FB.setDoc(FB.doc('users',muid),{role:'manager',companyId:cid,name:m||n,phone:ph,email:e,active:true,photo:''});
+  await FB.setDoc(FB.doc('secrets',muid),{pass:p,email:e,at:Date.now()}).catch(()=>{});
   await FB.setDoc(FB.doc('companies',cid,'settings','main'),{...DEFAULT_SETTINGS,rules:DEFAULT_RULES,custRules:{}});
   credSheet(m||n,e,p)}catch(err){b.disabled=false;b.textContent='إنشاء الحساب';toast(err&&err.code&&err.code.startsWith('auth/')?authErr(err):(ERR_AR[err&&err.code]||'حصلت مشكلة، جرّب تاني'))}};
 function editCompany(id){const c=S.companies.find(x=>x.id===id);
@@ -301,3 +303,26 @@ render=function(){if(!ME)return;
  const p=S.profile;const ub=$('#userBtn');if(ub&&p&&p.photo&&!ub.querySelector('img'))ub.innerHTML=`<img src="${p.photo}" alt="" style="width:100%;height:100%;border-radius:50%;object-fit:cover">`;
  if(ub&&(!p||!p.photo)&&ub.querySelector('img'))ub.innerHTML='<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>';
 };
+
+/* ---------- admin sets a password directly (owner → company owner, company owner → staff) ---------- */
+let PA={};
+async function passAdmin(uidT,coId){let who,email;
+ if(coId){const c=S.companies.find(z=>z.id===coId)||{};who=c.manager||c.name;email=c.email}
+ else{const u=R(uidT).name!=='؟'?R(uidT):Acc(uidT);who=u&&u.name;email=u&&u.email}
+ if(!uidT||!email)return toast('الحساب ده ناقص بيانات');
+ sheet(`<h3>كلمة سر ${esc(who||'')}</h3><div class="geo"><span class="spin" style="width:30px;height:30px;color:var(--accent)"></span></div>`);
+ let cur='';try{const s=await FB.getDoc(FB.doc('secrets',uidT));if(s.exists())cur=s.data().pass||''}catch(e){}
+ PA={uid:uidT,email,who,cur};
+ sheet(`<h3>كلمة سر ${esc(who||'')}</h3><div class="sub" dir="ltr" style="text-align:right">${esc(email)}</div>
+ ${cur?`<div class="card"><div class="kv"><span>كلمة السر الحالية</span><b dir="ltr" style="user-select:all;font-size:17px">${esc(cur)}</b></div></div>`
+  :`<div class="note">الحساب ده اتعمل قبل التحديث ده، فكلمة السر الحالية مش متسجلة عندنا. لو عارفها اكتبها تحت، أو ابعتله لينك تغيير على الإيميل.</div>
+   <label class="f">كلمة السر الحالية<input id="paC" dir="ltr" autocapitalize="off" autocorrect="off" spellcheck="false"></label>`}
+ <label class="f">كلمة السر الجديدة (٦ حروف أو أرقام على الأقل)<input id="paN" dir="ltr" autocapitalize="off" autocorrect="off" spellcheck="false" value="${String(Math.floor(100000+Math.random()*900000))}"></label>
+ <button class="btn pri big" id="paB" onclick="doPassAdmin()">غيّر كلمة السر</button>
+ <button class="btn" onclick="sendReset('${esc(email)}')">أو ابعتله لينك على الإيميل</button>`)}
+async function doPassAdmin(){const cur=PA.cur||($('#paC')?$('#paC').value.trim():''),nw=$('#paN').value.trim();
+ if(!cur)return toast('اكتب كلمة السر الحالية');if(nw.length<6)return toast('كلمة السر لازم ٦ حروف على الأقل');
+ const b=$('#paB');b.disabled=true;b.textContent='بنغيّر...';
+ try{await FB.adminSetPassword(PA.email,cur,nw);await FB.setDoc(FB.doc('secrets',PA.uid),{pass:nw,email:PA.email,at:Date.now()});credSheet(PA.who||'',PA.email,nw,'كلمة السر اتغيرت ✓')}
+ catch(e){b.disabled=false;b.textContent='غيّر كلمة السر';const c=e&&e.code||'';
+  toast(/invalid-credential|wrong-password/.test(c)?'كلمة السر الحالية المتسجلة مش صح. ابعتله لينك على الإيميل.':(c.startsWith('auth/')?authErr(e):Sync.fail(e)))}}
