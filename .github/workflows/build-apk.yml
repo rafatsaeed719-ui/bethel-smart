@@ -21,6 +21,8 @@ jobs:
           java-version: 21
       - name: Install packages
         run: npm install --no-audit --no-fund
+      - name: Stamp version
+        run: echo "window.APP_BUILD=${{ github.run_number }};" > www/version.js
       - name: Bundle app
         run: npm run build
       - name: Add Android platform
@@ -52,6 +54,7 @@ jobs:
       - name: Publish web link (gh-pages)
         run: |
           rm -rf site && mkdir site && cp -r www/* site/ && cp bethel-smart.apk site/
+          echo '{"build": ${{ github.run_number }}}' > site/version.json
           touch site/.nojekyll
           cd site && git init -q -b gh-pages && git add -A
           git -c user.name="github-actions" -c user.email="actions@github.com" commit -qm "Web app ${GITHUB_SHA::7}"

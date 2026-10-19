@@ -242,6 +242,9 @@ body.auth main{padding-block:28px 40px}
 .brandfoot img{width:22px;height:22px;border-radius:6px;background:#fff;padding:2px}
  #printArea{display:none}
 @media print{body.printing>*:not(#printArea){display:none!important}body.printing #printArea{display:block}body.printing{background:#fff}#printArea .invdoc{width:100%;padding:0}@page{size:A4;margin:12mm}}
+.upd{position:fixed;left:0;right:0;bottom:calc(74px + env(safe-area-inset-bottom,0px));z-index:30;display:flex;justify-content:center;padding-inline:12px;animation:rise .4s ease both}
+.upd .in{max-width:500px;width:100%;display:flex;align-items:center;gap:10px;background:linear-gradient(120deg,#0B2C55,#0B7F6C);color:#fff;border-radius:16px;padding:12px 14px;box-shadow:0 10px 30px rgba(11,44,85,.35)}
+.upd b{display:block}.upd .sub{color:rgba(255,255,255,.8)}.upd a{flex:none;text-decoration:none}
 .welcome .hero{width:100%;max-height:280px;object-fit:cover;border-radius:14px;border:1px solid var(--line)}
 </style>
 </head>
@@ -262,6 +265,7 @@ body.auth main{padding-block:28px 40px}
 </div>
 <nav class="tabs"><div class="in" id="tabs"></div></nav>
 <div id="sheetRoot"></div>
+<script src="version.js"></script>
 <script src="bundle.js"></script>
 <script src="ui.js"></script>
 <script src="extra.js"></script>
