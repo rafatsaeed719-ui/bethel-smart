@@ -193,7 +193,7 @@ VIEWS.companies=()=>{const list=S.companies.filter(c=>!c.deleted).sort((a,b)=>(b
   <div class="grid2"><button class="btn pri" onclick="openChat('${c.id}','owner')">${tile('chat')}شات ${unread(t)?'<span class="dotn">جديد</span>':''}</button><button class="btn" onclick="editCompany('${c.id}')">✏️ تعديل والاشتراك</button></div>
   <div class="row"><button class="btn sm" onclick="warnCompany('${c.id}')">⚠️ إنذار بالدفع</button>
    <button class="btn sm ${c.active?'danger':'okb'}" onclick="toggleCompany('${c.id}')">${c.active?'إيقاف لحين الدفع':'تشغيل تاني'}</button>
-   <button class="btn sm" onclick="passAdmin('${c.managerUid}','${c.id}')">🔑 كلمة السر</button>
+   <button class="btn sm" onclick="passAdmin('${c.managerUid||''}','${c.id}')">🔑 كلمة السر</button>
    <button class="btn sm danger" onclick="askDeleteCompany('${c.id}')">حذف</button></div></div>`}).join('')||'<div class="empty">لسه مفيش شركات. دوس "+ شركة" علشان تعمل أول نسخة.</div>'}
  <div class="note">الإيقاف بيقفل البرنامج على الشركة وكل موظفينها، والبيانات بتفضل محفوظة لحد ما تشغّلها تاني.</div>`};
 const planFields=c=>`<div class="grid2"><label class="f">نوع الاشتراك<select id="cpl" onchange="$('#cpuW').hidden=this.value==='lifetime'">${Object.entries(PLAN_AR).map(([k,l])=>`<option value="${k}" ${(c.plan||'monthly')===k?'selected':''}>${l}</option>`).join('')}</select></label>
@@ -407,3 +407,57 @@ function saveBrand(){const d={logo:BR.logo||'',name:$('#brN').value.trim(),addre
  S.brand=d;FB.setDoc(FB.doc('companies',ME.companyId,'settings','brand'),d).then(()=>toast('اتحفظت بيانات الفاتورة')).catch(e=>Sync.fail(e));closeSheet()}
 const _rules=VIEWS.rules;
 VIEWS.rules=()=>`<div class="card"><div class="row between nowrap"><div class="row nowrap">${tile('invoices')}<div><h3>بيانات الفاتورة</h3><div class="sub">${S.brand&&S.brand.name?esc(S.brand.name)+(S.brand.logo?' · فيها لوجو':''):'اسم الشركة واللوجو والعنوان اللي بيطلعوا على الفاتورة المطبوعة'}</div></div></div><button class="btn sm" onclick="brandForm()">${S.brand&&S.brand.name?'تعديل':'إضافة'}</button></div></div>`+_rules();
+
+/* ===================== فاتورة من صاحب الشركة + إرسالها للمندوب ===================== */
+TABS.manager.splice(2,0,['allinv','الفواتير']);
+
+const _allinv=VIEWS.allinv;
+VIEWS.allinv=()=>(ME.role==='manager'?`<button class="btn pri big" onclick="mgrInvForm()">${tile('invoices')}فاتورة جديدة</button>`:'')+_allinv();
+
+let MI={};
+function mgrInvForm(){if(!S.reps.length)return toast('اعمل حساب مندوب الأول من صفحة الموظفين');
+ MI={rep:S.reps[0].id,src:'main',cust:'',no:'',date:TODAY,lines:[{prod:(S.products[0]||{}).id,qty:1,price:(S.products[0]||{}).price||0,disc:0}],notify:true};drawMgrInv()}
+function syncMI(){const g=id=>$(id);if(g('#mr'))MI.rep=g('#mr').value;if(g('#ms'))MI.src=g('#ms').value;if(g('#mc'))MI.cust=g('#mc').value;if(g('#mno'))MI.no=g('#mno').value;if(g('#mdt'))MI.date=g('#mdt').value;if(g('#mnt'))MI.notify=g('#mnt').checked;
+ MI.lines.forEach((l,k)=>{const q=s=>$(`#${s}${k}`);if(!q('mlp'))return;l.prod=q('mlp').value;l.qty=+q('mlq').value||0;l.price=+q('mlpr').value||0;l.disc=+q('mld').value||0})}
+const avail=(src,rep,p)=>src==='main'?(P(p).main||0):(stockOf(rep)[p]||0);
+function drawMgrInv(){if(!S.products.length)return toast('ضيف أصناف الأول من صفحة المخزن');
+ const tot=MI.lines.reduce((s,l)=>s+lineTotal(l),0);
+ sheet(`<h3>فاتورة جديدة</h3>
+ <div class="grid2"><label class="f">المندوب<select id="mr" onchange="syncMI();drawMgrInv()">${S.reps.map(r=>`<option value="${r.id}" ${MI.rep===r.id?'selected':''}>${esc(r.name)}</option>`).join('')}</select></label>
+ <label class="f">البضاعة تتخصم من<select id="ms" onchange="syncMI();drawMgrInv()"><option value="main" ${MI.src==='main'?'selected':''}>المخزن الرئيسي</option><option value="rep" ${MI.src==='rep'?'selected':''}>مخزن المندوب</option></select></label></div>
+ <label class="f">العميل<select id="mc"><option value="">اختار الصيدلية / العيادة</option>${S.reps.map(r=>{const cs=S.customers.filter(c=>c.addedBy===r.id);return cs.length?`<optgroup label="عملاء ${esc(r.name)}">${cs.map(c=>`<option value="${c.id}" ${MI.cust===c.id?'selected':''}>${esc(c.name)}</option>`).join('')}</optgroup>`:''}).join('')}</select></label>
+ <div class="grid2"><label class="f">رقم الفاتورة<input id="mno" inputmode="numeric" value="${esc(MI.no)}" placeholder="مثلاً 2051"></label><label class="f">التاريخ<input type="date" id="mdt" value="${MI.date}"></label></div>
+ ${MI.lines.map((l,k)=>`<div class="line-ed"><select id="mlp${k}" onchange="syncMI();MI.lines[${k}].price=P(this.value).price;drawMgrInv()">${S.products.map(p=>`<option value="${p.id}" ${l.prod===p.id?'selected':''}>${esc(p.name)}</option>`).join('')}</select>
+  <button class="btn sm danger" onclick="syncMI();MI.lines.splice(${k},1);drawMgrInv()" ${MI.lines.length<2?'disabled':''}>حذف</button>
+  <div class="r3"><label class="f">الكمية<input type="number" min="1" id="mlq${k}" value="${l.qty}" oninput="syncMI();$('#mtot').textContent=money(MI.lines.reduce((s,l)=>s+lineTotal(l),0))"></label><label class="f">السعر<input type="number" id="mlpr${k}" value="${l.price}" oninput="syncMI();$('#mtot').textContent=money(MI.lines.reduce((s,l)=>s+lineTotal(l),0))"></label><label class="f">خصم ٪<input type="number" min="0" max="100" id="mld${k}" value="${l.disc}" oninput="syncMI();$('#mtot').textContent=money(MI.lines.reduce((s,l)=>s+lineTotal(l),0))"></label></div>
+  <div class="sub" style="grid-column:1/-1">متاح في ${MI.src==='main'?'المخزن الرئيسي':'مخزن المندوب'}: <b class="num" style="color:var(--${avail(MI.src,MI.rep,l.prod)>=l.qty?'ok':'bad'})">${fmt(avail(MI.src,MI.rep,l.prod))}</b></div></div>`).join('')}
+ <button class="btn" onclick="syncMI();const p=S.products[0];MI.lines.push({prod:p.id,qty:1,price:p.price,disc:0});drawMgrInv()">+ إضافة صنف</button>
+ <div class="kv" style="font-size:16px"><span>إجمالي الفاتورة</span><b class="num" id="mtot">${money(tot)}</b></div>
+ <label class="row nowrap" style="gap:10px;cursor:pointer"><input type="checkbox" id="mnt" ${MI.notify?'checked':''}><span>ابعت الفاتورة للمندوب في الشات</span></label>
+ <button class="btn pri big" onclick="saveMgrInv()">حفظ الفاتورة</button>`)}
+function saveMgrInv(){syncMI();if(!MI.cust)return toast('اختار العميل');const no=MI.no.trim();if(!no)return toast('اكتب رقم الفاتورة');
+ if(S.invoices.some(i=>i.no===no))return toast('رقم الفاتورة ده متسجل قبل كده');
+ const need={};MI.lines.forEach(l=>need[l.prod]=(need[l.prod]||0)+l.qty);
+ for(const p in need)if(avail(MI.src,MI.rep,p)<need[p])return toast(`الكمية مش كفاية: ${short(P(p).name)}`);
+ for(const p in need){if(MI.src==='main')P(p).main-=need[p];else stockOf(MI.rep)[p]-=need[p]}
+ const inv={id:uid('i'),no,rep:MI.rep,cust:MI.cust,date:MI.date,lines:MI.lines.map(l=>({...l})),img:'',status:'open',returns:[],collected:0,by:'manager',src:MI.src};
+ S.invoices.push(inv);const notify=MI.notify;closeSheet();render();
+ if(notify)sendInvToRep(inv.id,true);toast('اتسجلت الفاتورة');setTimeout(()=>invDetail(inv.id),250)}
+function sendInvToRep(id,silent){const i=S.invoices.find(x=>x.id===id);if(!i||!i.rep)return;const path=['companies',ME.companyId,'chats',i.rep];const at=Date.now();
+ const text=`📄 فاتورة رقم ${i.no} لـ ${Cu(i.cust).name} بقيمة ${money(invTotal(i)-retValue(i))}.\nتلاقيها في الفواتير، وتقدر تطبعها أو تبعتها للعميل.`;
+ FB.setDoc(FB.doc(...path,'messages',uid('m')),{text,from:ME.uid,name:myName(),at,inv:i.id}).catch(e=>Sync.fail(e));
+ FB.setDoc(FB.doc(...path),{lastAt:at,lastFrom:ME.uid,lastText:text.slice(0,120),lastName:myName(),readAt:{[ME.uid]:at}},{merge:true}).catch(()=>{});
+ if(!silent)toast('الفاتورة اتبعتت لـ '+R(i.rep).name)}
+
+/* invoice detail: clear send-to-customer / send-to-rep buttons */
+const _invDetail2=invDetail;
+invDetail=function(id){_invDetail2(id);const sh=document.querySelector('.sheet');if(!sh)return;const i=S.invoices.find(x=>x.id===id)||{};
+ const shareBtn=sh.querySelector('button[onclick*="\'share\'"]');if(shareBtn)shareBtn.textContent='📤 ابعتها للعميل (واتساب / إيميل)';
+ const c=Cu(i.cust)||{};
+ if(c.phone)sh.insertAdjacentHTML('beforeend',`<div class="sub">رقم العميل: <b dir="ltr" style="user-select:all">${esc(c.phone)}</b> · لما تدوس "ابعتها للعميل" اختار واتساب وابعتها على الرقم ده.</div>`);
+ if(ME.role==='manager'&&i.rep)sh.insertAdjacentHTML('beforeend',`<button class="btn" onclick="sendInvToRep('${id}')">📨 ابعتها لـ ${esc(R(i.rep).name)} في الشات</button>`)};
+
+/* chat: messages carrying an invoice get an "open" button */
+const _drawChat=drawChat;
+drawChat=function(){_drawChat();const b=$('#chatBox');if(!b||!CHAT)return;const nodes=b.querySelectorAll('.msg');
+ CHAT.msgs.forEach((m,k)=>{if(m.inv&&nodes[k]&&S.invoices.some(x=>x.id===m.inv))nodes[k].insertAdjacentHTML('beforeend',`<button class="btn sm" style="margin-top:6px" onclick="invDetail('${m.inv}')">📄 افتح الفاتورة</button>`)})};
