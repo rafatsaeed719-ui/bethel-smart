@@ -770,7 +770,7 @@ function showLogin(msg){ME=null;document.body.classList.add('auth');closeSheet()
     <button class="btn pri big" id="lb" type="submit">${own?'إنشاء الحساب':'دخول'}</button></form>
    <div class="row between"><button class="btn sm" onclick="forgot()">نسيت كلمة السر</button>
     <button class="btn sm" onclick="LOGIN.mode=LOGIN.mode==='owner'?'in':'owner';LOGIN.msg='';LOGIN.email=$('#le').value;showLogin()">${own?'رجوع للدخول':'صاحب البرنامج؟'}</button></div></div>
-  ${window.FB&&!FB.native?`<a class="btn acc big" href="bethel-smart.apk" download="bethel-smart.apk" style="text-decoration:none">📲 تحميل البرنامج على الموبايل (أندرويد)</a><div class="sub" style="text-align:center">أو كمّل من المتصفح على طول، نفس الحساب ونفس البيانات</div>`:''}</div>${sig()}`}
+  ${window.FB&&!FB.native?`<a class="btn acc big" href="https://github.com/rafatsaeed719-ui/bethel-smart/releases/latest/download/bethel-smart.apk" style="text-decoration:none">📲 تحميل البرنامج على الموبايل (أندرويد)</a><div class="sub" style="text-align:center">أو كمّل من المتصفح على طول، نفس الحساب ونفس البيانات</div>`:''}</div>${sig()}`}
 async function doLogin(){const e=$('#le').value.trim().toLowerCase(),p=$('#lp').value.trim();LOGIN.email=e;const b=$('#lb');b.disabled=true;b.textContent='لحظة...';
  try{if(LOGIN.mode==='owner'){if(e!==OWNER_EMAIL){b.disabled=false;b.textContent='إنشاء الحساب';return showLogin('الإيميل ده مش إيميل صاحب البرنامج')}await FB.signUp(e,p)}else await FB.signIn(e,p);LOGIN.msg=''}
  catch(err){const c=err&&err.code||'';

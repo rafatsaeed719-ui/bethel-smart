@@ -463,11 +463,11 @@ drawChat=function(){_drawChat();const b=$('#chatBox');if(!b||!CHAT)return;const 
  CHAT.msgs.forEach((m,k)=>{if(m.inv&&nodes[k]&&S.invoices.some(x=>x.id===m.inv))nodes[k].insertAdjacentHTML('beforeend',`<button class="btn sm" style="margin-top:6px" onclick="invDetail('${m.inv}')">📄 افتح الفاتورة</button>`)})};
 
 /* ===================== تنبيه بالنسخة الجديدة ===================== */
-const SITE='https://rafatsaeed719-ui.github.io/bethel-smart/';
+const SITE='https://rafatsaeed719-ui.github.io/bethel-smart/',VER_URL='https://raw.githubusercontent.com/rafatsaeed719-ui/bethel-smart/gh-pages/version.json',APK_URL='https://github.com/rafatsaeed719-ui/bethel-smart/releases/latest/download/bethel-smart.apk';
 async function checkUpdate(){if(!window.FB||!FB.native||!window.APP_BUILD)return;
- try{const r=await fetch(SITE+'version.json?t='+Date.now(),{cache:'no-store'});if(!r.ok)return;const v=await r.json();
+ try{const r=await fetch(VER_URL+'?t='+Date.now(),{cache:'no-store'});if(!r.ok)return;const v=await r.json();
   if(!(v.build>window.APP_BUILD))return;try{if(sessionStorage.getItem('bs_upd_hide')==String(v.build))return}catch(e){}
   if(document.querySelector('.upd'))return;
   document.body.insertAdjacentHTML('beforeend',`<div class="upd" role="status"><div class="in"><div style="flex:1;min-width:0"><b>فيه نسخة جديدة من بيثيل اسمارت</b><div class="sub" style="font-size:12.5px">نزّلها وثبّتها فوق القديمة، بياناتك هتفضل زي ما هي.</div></div>
-   <a class="btn acc sm" href="${SITE}bethel-smart.apk" target="_blank" rel="noopener">تحديث</a><button class="btn sm" aria-label="إخفاء" onclick="try{sessionStorage.setItem('bs_upd_hide','${v.build}')}catch(e){};this.closest('.upd').remove()">✕</button></div></div>`)}catch(e){}}
+   <a class="btn acc sm" href="${APK_URL}" target="_blank" rel="noopener">تحديث</a><button class="btn sm" aria-label="إخفاء" onclick="try{sessionStorage.setItem('bs_upd_hide','${v.build}')}catch(e){};this.closest('.upd').remove()">✕</button></div></div>`)}catch(e){}}
 setTimeout(checkUpdate,4000);setInterval(checkUpdate,6*3600*1000);document.addEventListener('visibilitychange',()=>{if(!document.hidden)checkUpdate()});
