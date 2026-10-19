@@ -138,7 +138,7 @@ const Sync={
  fail(e){console.warn(e);toast(ERR_AR[e&&e.code]||'حصلت مشكلة في الحفظ')},
  track(name,docs){for(const k of [...this.shadow.keys()])if(k.startsWith(name+'/'))this.shadow.delete(k);docs.forEach(([id,o])=>this.shadow.set(name+'/'+id,stable(o)))},
  on(name,ref,fn){const un=FB.onSnapshot(ref,{includeMetadataChanges:true},snap=>{fn(snap);this.loaded.add(name);scheduleRender()},
-   err=>{console.warn(name,err);this.loaded.add(name);if(err.code==='permission-denied'&&['company','users'].includes(name)){logoutWith('الحساب أو اشتراك الشركة موقوف. كلّم المسؤول عنك.')}else scheduleRender()});this.unsubs.push(un)},
+   err=>{console.warn(name,err);this.loaded.add(name);if(err.code==='permission-denied'&&name==='company'){logoutWith('الحساب أو اشتراك الشركة موقوف. كلّم المسؤول عنك.')}else scheduleRender()});this.unsubs.push(un)},
  list(name,ref,set){this.on(name,ref,snap=>{const all=snap.docs.map(d=>({id:d.id,...d.data(),_p:d.metadata.hasPendingWrites}));
    this.track(name,all.map(o=>{const {_p,...x}=o;return [o.id,noId(x)]}));set(all.map(o=>{const {_p,...x}=o;x.__p=_p;return x}))})},
  strip(a){return a.map(o=>{const {__p,...x}=o;return x})},
@@ -542,11 +542,11 @@ DASH.deduct=()=>`${S.reps.map(r=>{const d=deductions(r.id);const kinds={};d.item
 /* ============ MANAGER: REPS ============ */
 const PERMS=[['addCust','إضافة عملاء جداد'],['editCust','تحديث بيانات العملاء'],['invoices','رفع وتقفيل الفواتير'],['returns','عمل مرتجع']];
 VIEWS.reps=()=>`<div class="row between"><h2>الموظفين</h2><button class="btn pri" onclick="repForm()">+ حساب مندوب</button></div>
- ${S.reps.map(r=>`<div class="card"><div class="row between nowrap"><div class="row nowrap">${avatar(r)}<h3>${esc(r.name)}</h3></div><span class="pill acc">${esc(r.area)}</span></div>
+ ${S.reps.map(r=>`<div class="card"><div class="row between nowrap"><button class="row nowrap linkish" onclick="empProfile('${r.id}')">${avatar(r)}<h3>${esc(r.name)}</h3></button><span class="pill acc">${esc(r.area)}</span></div>
   <div class="kv"><span>الإيميل</span><span class="num" dir="ltr">${esc(r.email)}</span></div>
   <div class="grid2"><label class="f">تارجت أسبوعي (ج)<input type="number" min="0" id="tw_${r.id}" value="${plan(r.id).targetWeek}" onchange="plan('${r.id}').targetWeek=+this.value||0;render();toast('اتحدد التارجت')"></label><label class="f">تارجت شهري (ج)<input type="number" min="0" id="tm_${r.id}" value="${plan(r.id).targetMonth}" onchange="plan('${r.id}').targetMonth=+this.value||0;render();toast('اتحدد التارجت')"></label></div>
   <div class="sub">الصلاحيات</div><div class="chips">${PERMS.map(([k,l])=>`<button class="chip ${(r.perms||{})[k]?'on':''}" aria-pressed="${!!(r.perms||{})[k]}" onclick="const x=R('${r.id}');x.perms={...(x.perms||{}),'${k}':!(x.perms||{})['${k}']};render()">${(r.perms||{})[k]?'✓ ':''}${l}</button>`).join('')}</div>
-  <div class="row"><button class="btn sm" onclick="sendReset('${esc(r.email)}')">ابعتله لينك تغيير كلمة السر</button><button class="btn sm danger" onclick="askDeactivate('${r.id}')">إيقاف الحساب</button></div></div>`).join('')||'<div class="empty">لسه مفيش مناديب. دوس "+ حساب مندوب" علشان تعمل أول حساب.</div>'}
+  <div class="row"><button class="btn sm pri" onclick="empProfile('${r.id}')">ساعات الشغل</button><button class="btn sm" onclick="openChat('${ME.companyId}','${r.id}')">💬 شات ${typeof unread==='function'&&unread(S.threads&&S.threads[r.id])?'<span class="dotn">جديد</span>':''}</button><button class="btn sm" onclick="sendReset('${esc(r.email)}')">لينك كلمة السر</button><button class="btn sm danger" onclick="askDeactivate('${r.id}')">إيقاف الحساب</button></div></div>`).join('')||'<div class="empty">لسه مفيش مناديب. دوس "+ حساب مندوب" علشان تعمل أول حساب.</div>'}
  <div class="note">كل مندوب بيدخل بالإيميل وكلمة السر اللي انت بتبعتهاله، وبيشوف عملاءه وفواتيره ومخزنه بس حسب صلاحياته. وكل موظف يقدر يحط صورته من صفحة "حسابي".</div>
  ${accSection()}`;
 function repForm(){const pw=Math.random().toString(36).slice(2,8);
@@ -741,7 +741,7 @@ function accSection(){return `<div class="row between" style="margin-top:6px"><d
  ${S.accountants.map(a=>`<div class="card"><div class="row nowrap">${avatar(a)}<h3>${esc(a.name)}</h3><span class="pill acc">حسابات</span></div>
   <div class="kv"><span>الإيميل</span><span class="num" dir="ltr">${esc(a.email)}</span></div>
   <div class="sub">يقدر ينزّل</div><div class="chips">${APERMS.map(([k,l])=>`<button class="chip ${(a.perms||{})[k]?'on':''}" aria-pressed="${!!(a.perms||{})[k]}" onclick="const x=Acc('${a.id}');x.perms={...(x.perms||{}),'${k}':!(x.perms||{})['${k}']};render()">${(a.perms||{})[k]?'✓ ':''}${l}</button>`).join('')}</div>
-  <div class="row"><button class="btn sm" onclick="sendReset('${esc(a.email)}')">لينك تغيير كلمة السر</button><button class="btn sm danger" onclick="askDeactivate('${a.id}')">إيقاف الحساب</button></div></div>`).join('')||'<div class="empty">مفيش موظفين حسابات</div>'}
+  <div class="row"><button class="btn sm" onclick="openChat('${ME.companyId}','${a.id}')">💬 شات ${typeof unread==='function'&&unread(S.threads&&S.threads[a.id])?'<span class="dotn">جديد</span>':''}</button><button class="btn sm" onclick="sendReset('${esc(a.email)}')">لينك تغيير كلمة السر</button><button class="btn sm danger" onclick="askDeactivate('${a.id}')">إيقاف الحساب</button></div></div>`).join('')||'<div class="empty">مفيش موظفين حسابات</div>'}
  <div class="note">موظف الحسابات بيشوف الفواتير وصفحة التقارير بس، وبينزّل الملفات اللي انت مدّيله صلاحيتها.</div>`}
 function accForm(){const pw=Math.random().toString(36).slice(2,8);
  sheet(`<h3>موظف حسابات جديد</h3><label class="f">الاسم<input id="an"></label><label class="f">الإيميل<input id="ae" dir="ltr" placeholder="name@nilepharma.app"></label><label class="f">كلمة السر<input id="ap" dir="ltr" value="${pw}"></label>

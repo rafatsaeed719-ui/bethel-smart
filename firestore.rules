@@ -8,6 +8,10 @@ service cloud.firestore {
     function inCo(c) { return signed() && me().companyId == c && me().active != false && coOn(c); }
     function isMgr(c) { return inCo(c) && me().role == 'manager'; }
 
+    match /notices/{n} {
+      allow read: if signed();
+      allow write: if isOwner();
+    }
     match /config/{d} {
       allow read: if signed();
       allow write: if isOwner();
@@ -17,15 +21,21 @@ service cloud.firestore {
       allow create: if isOwner() || (isMgr(request.resource.data.companyId) && request.resource.data.role in ['rep', 'acc']);
       allow update: if isOwner()
         || (isMgr(resource.data.companyId) && resource.data.role in ['rep', 'acc'] && request.resource.data.companyId == resource.data.companyId && request.resource.data.role == resource.data.role)
-        || (signed() && request.auth.uid == u && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['photo']));
+        || (signed() && request.auth.uid == u && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['photo', 'name', 'phone']));
     }
     match /companies/{c} {
-      allow read: if isOwner() || inCo(c);
+      allow read: if isOwner() || (signed() && me().companyId == c);
       allow write: if isOwner();
+      match /chats/{t} {
+        allow read, write: if isOwner() || isMgr(c) || (t == 'owner' && signed() && me().companyId == c && me().role == 'manager') || (t == request.auth.uid && inCo(c));
+        match /messages/{m} {
+          allow read, write: if isOwner() || isMgr(c) || (t == 'owner' && signed() && me().companyId == c && me().role == 'manager') || (t == request.auth.uid && inCo(c));
+        }
+      }
       match /{col}/{d=**} {
-        allow read: if isOwner() || inCo(c);
-        allow write: if isOwner() || isMgr(c)
-          || (inCo(c) && col in ['visits', 'customers', 'invoices', 'orders', 'stock', 'plans', 'tasks', 'vacations']);
+        allow read: if col != 'chats' && (isOwner() || inCo(c));
+        allow write: if col != 'chats' && (isOwner() || isMgr(c)
+          || (inCo(c) && col in ['visits', 'customers', 'invoices', 'orders', 'stock', 'plans', 'tasks', 'vacations']));
       }
     }
   }

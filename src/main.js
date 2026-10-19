@@ -2,9 +2,9 @@
 // so the UI script (www/ui.js) can stay a plain script with inline handlers.
 import { initializeApp } from 'firebase/app';
 import { initializeAuth, indexedDBLocalPersistence, inMemoryPersistence, signInWithEmailAndPassword, createUserWithEmailAndPassword,
-  signOut, onAuthStateChanged, sendPasswordResetEmail } from 'firebase/auth';
+  signOut, onAuthStateChanged, sendPasswordResetEmail, EmailAuthProvider, reauthenticateWithCredential, updatePassword } from 'firebase/auth';
 import { initializeFirestore, persistentLocalCache, persistentSingleTabManager, doc, collection, query, where, onSnapshot,
-  setDoc, deleteDoc, updateDoc, getDoc } from 'firebase/firestore';
+  setDoc, deleteDoc, updateDoc, getDoc, getDocs, orderBy, limitToLast, writeBatch } from 'firebase/firestore';
 import { Capacitor } from '@capacitor/core';
 import { Geolocation } from '@capacitor/geolocation';
 import { Filesystem, Directory } from '@capacitor/filesystem';
@@ -75,7 +75,13 @@ window.FB = {
     const c = await createUserWithEmailAndPassword(helperAuth, email, pass);
     const uid = c.user.uid; await signOut(helperAuth); return uid;
   },
-  doc: (...p) => doc(db, ...p), col: (...p) => collection(db, ...p), query, where, onSnapshot, setDoc, deleteDoc, updateDoc, getDoc,
+  async changePassword(current, next) {
+    const u = auth.currentUser; if (!u) throw { code: 'auth/no-user' };
+    await reauthenticateWithCredential(u, EmailAuthProvider.credential(u.email, current));
+    await updatePassword(u, next);
+  },
+  batch: () => writeBatch(db),
+  doc: (...p) => doc(db, ...p), col: (...p) => collection(db, ...p), query, where, orderBy, limitToLast, onSnapshot, setDoc, deleteDoc, updateDoc, getDoc, getDocs,
   getPosition, saveFile
 };
 window.dispatchEvent(new Event('fb-ready'));

@@ -227,6 +227,20 @@ body.auth main{padding-block:28px 40px}
 .login{display:grid;gap:16px;max-width:420px;margin:0 auto;width:100%}
 .login .plate img{width:200px}
 .btn{user-select:none;-webkit-user-select:none}
+.linkish{all:unset;cursor:pointer;display:flex;align-items:center;gap:8px;min-width:0}
+.linkish h3{text-decoration:underline;text-decoration-color:var(--line);text-underline-offset:4px}
+.dotn{display:inline-block;min-width:18px;height:18px;border-radius:9px;background:var(--bad);color:#fff;font-size:11px;text-align:center;line-height:18px;padding:0 6px;font-weight:600;vertical-align:middle}
+.chat{display:flex;flex-direction:column;gap:8px;height:52vh;overflow-y:auto;padding:6px 2px;background:var(--sunk);border-radius:14px;padding-inline:8px}
+.msg{max-width:82%;padding:8px 12px;border-radius:16px;font-size:14.5px;line-height:1.6;overflow-wrap:anywhere;box-shadow:0 1px 2px rgba(0,0,0,.06)}
+.msg.me{align-self:flex-start;background:linear-gradient(180deg,var(--brand-hi),var(--brand));color:var(--brand-ink);border-start-start-radius:4px}
+.msg.them{align-self:flex-end;background:var(--surface);border:1px solid var(--line);border-start-end-radius:4px}
+.msg .who{display:block;font-size:12px;color:var(--accent);margin-bottom:2px}
+.msg time{display:block;font-size:11px;opacity:.72;margin-top:3px}
+.chatbar{display:flex;gap:8px;align-items:flex-end}
+.chatbar textarea{min-height:46px;max-height:120px;resize:none}
+.brandfoot{display:flex;align-items:center;justify-content:center;gap:6px;color:var(--muted);font-size:12px;font-weight:600;padding-top:6px;opacity:.85}
+.brandfoot img{width:22px;height:22px;border-radius:6px;background:#fff;padding:2px}
+.welcome .hero{width:100%;max-height:280px;object-fit:cover;border-radius:14px;border:1px solid var(--line)}
 </style>
 </head>
 <body>
@@ -248,5 +262,6 @@ body.auth main{padding-block:28px 40px}
 <div id="sheetRoot"></div>
 <script src="bundle.js"></script>
 <script src="ui.js"></script>
+<script src="extra.js"></script>
 </body>
 </html>
