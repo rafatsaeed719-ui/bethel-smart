@@ -148,7 +148,7 @@ openNotifs=function(){if(!ME)return;const ns=myNotices().slice(0,20);const seen=
 
 /* ---------- employee profile with daily work hours ---------- */
 let EP={id:null,m:MONTH};
-function workDays(rep,month){const by={};S.visits.filter(v=>v.rep===rep&&v.date.startsWith(month)).forEach(v=>(by[v.date]=by[v.date]||[]).push(v.time));
+function workDays(rep,month){const by={};allV().filter(v=>mine(v,rep)&&v.date.startsWith(month)).forEach(v=>(by[v.date]=by[v.date]||[]).push(v.time));
  return Object.entries(by).sort((a,b)=>b[0].localeCompare(a[0])).map(([date,ts])=>{ts.sort();const m=t=>{const [h,mi]=t.split(':').map(Number);return h*60+mi};
   return {date,n:ts.length,first:ts[0],last:ts[ts.length-1],span:m(ts[ts.length-1])-m(ts[0])}})}
 const hm=t=>{const [h,m]=t.split(':').map(Number);const d=new Date();d.setHours(h,m);return d.toLocaleTimeString('ar-EG',{hour:'numeric',minute:'2-digit'})};
@@ -531,3 +531,46 @@ drawGeo=function(cid){_drawGeo(cid);const c=Cu(cid);if(c.lat!=null||!GEO.pos)ret
  const b=[...sh.querySelectorAll('button.btn.big')].pop();
  b.insertAdjacentHTML('beforebegin',`<button class="btn acc big" onclick="setCustLocHere('${cid}')">📍 سجّل موقع العميل من هنا (دقة ± ${fmt(Math.round(GEO.pos.acc||0))} متر)</button>`)};
 function setCustLocHere(cid){const c=Cu(cid);if(!GEO.pos)return;c.lat=GEO.pos.lat;c.lng=GEO.pos.lng;render();toast('اتسجل موقع العميل');drawGeo(cid)}
+
+/* ===================== دابل فيزت: زيارة مشتركة تتحسب للاتنين ===================== */
+const _empty2=emptyState;emptyState=function(){return {..._empty2(),joint:[],team:[]}};
+function personName(id){if(!id)return '';if(ME&&id===ME.uid)return myName()||'أنا';const t=(S.team||[]).find(x=>x.id===id)||S.reps.find(x=>x.id===id);
+ if(t)return t.name;const co=S.company||{};if(id===co.managerUid)return (co.manager||'صاحب الشركة')+' (صاحب الشركة)';return 'زميل'}
+const _start3=Sync.start;
+Sync.start=function(){_start3.call(this);const r=ME.role;if(r==='owner'||r==='acc')return;const F=FB,co=ME.companyId;
+ this.on('team',F.query(F.col('users'),F.where('companyId','==',co)),s=>{S.team=s.docs.map(d=>({id:d.id,...d.data()})).filter(u=>u.active!==false&&(u.role==='rep'||u.role==='manager'))});
+ if(r==='rep'){let seen=null;this.on('joint',F.query(F.col('companies',co,'visits'),F.where('with','array-contains',ME.uid)),s=>{
+  const a=s.docs.map(d=>({id:d.id,...d.data()}));if(seen){const fresh=a.filter(v=>!seen.has(v.id));if(fresh.length)toast(`👥 ${personName(fresh[0].rep)} سجّل دابل فيزت معاك عند ${fresh[0].cname||'عميل'}`)}
+  seen=new Set(a.map(v=>v.id));S.joint=a})}};
+const teamFor=()=>(S.team||[]).filter(u=>u.id!==ME.uid&&u.id!==DV.rep);
+
+/* visit form: choose a partner */
+let DV={rep:null};
+const _drawVisit=drawVisit;
+drawVisit=function(){if(VF.with===undefined)VF.with=DV.rep?[ME.uid]:[];_drawVisit();const sh=document.querySelector('.sheet');if(!sh||!sh.querySelectorAll)return;
+ const opts=teamFor();const anchor=[...sh.querySelectorAll('.f')].find(e=>/الأصناف/.test(e.textContent));if(!anchor)return;
+ if(DV.rep){anchor.insertAdjacentHTML('beforebegin',`<div class="note" style="background:var(--accent-soft);color:var(--accent)">👥 دابل فيزت: انت و${esc(personName(DV.rep))}. الزيارة هتتحسب للاتنين.</div>`);return}
+ if(!opts.length)return;
+ anchor.insertAdjacentHTML('beforebegin',`<div class="f">👥 دابل فيزت مع (اختياري)<div class="chips">${opts.map(u=>`<button class="chip ${VF.with.includes(u.id)?'on':''}" onclick="dvToggle('${u.id}')">${esc(u.name)}${u.role==='manager'?' (صاحب الشركة)':''}</button>`).join('')}</div>
+  <div class="sub">الزيارة هتظهر في تقويم الاتنين وتتحسب في زيارات الاتنين.</div></div>`)};
+function dvToggle(id){VF.with.includes(id)?VF.with.splice(VF.with.indexOf(id),1):VF.with.push(id);drawVisit()}
+
+const _saveVisit2=saveVisit;
+saveVisit=function(){const before=new Set(S.visits.map(v=>v.id));const w=(VF.with||[]).slice(),cname=Cu(VF.cid).name,mgr=ME.role==='manager'&&DV.rep;
+ const role0=V.role;if(mgr)V.role=DV.rep;
+ try{_saveVisit2()}finally{if(mgr)V.role=role0}
+ const v=S.visits.find(x=>!before.has(x.id));if(!v)return;
+ v.cname=cname;if(w.length)v.with=w;if(mgr){v.rep=DV.rep;v.by=ME.uid;const o=S.orders.find(o=>o.cust===v.cust&&o.date===v.date&&o.rep===DV.rep&&!o.done);DV={rep:null};V.tab='dash'}
+ render();if(w.length)toast('👥 اتسجلت دابل فيزت · ظهرت عند الاتنين')};
+
+/* company owner starts a double visit with a rep */
+function dvStart(){if(!S.reps.length)return toast('لسه مفيش مناديب');
+ sheet(`<h3>👥 دابل فيزت مع مندوب</h3><div class="sub">انزل مع المندوب، واختار العميل، والزيارة تتسجل للاتنين. الموقع بيتحسب من موبايلك.</div>
+ <label class="f">المندوب<select id="dvR" onchange="dvCust()">${S.reps.map(r=>`<option value="${r.id}">${esc(r.name)}</option>`).join('')}</select></label>
+ <input id="dvQ" placeholder="ابحث باسم الصيدلية أو العيادة" oninput="dvCust()"><div class="card"><div class="list" id="dvL"></div></div>`);dvCust()}
+function dvCust(){const r=$('#dvR').value,q=($('#dvQ').value||'').trim();const cs=S.customers.filter(c=>c.addedBy===r&&(!q||c.name.includes(q)));
+ $('#dvL').innerHTML=cs.length?cs.map(c=>`<div class="item"><div class="grow"><div class="t">${esc(c.name)}</div><div class="d">${esc(c.type)}${c.lat==null?' · من غير موقع':''}</div></div><button class="btn sm pri" onclick="DV={rep:'${r}'};geoCheck('${c.id}')">ابدأ</button></div>`).join(''):'<div class="empty">مفيش عملاء للمندوب ده</div>'}
+const _closeSheet2=closeSheet;
+closeSheet=function(){if(DV.rep&&!document.querySelector('#vt'))DV={rep:null};_closeSheet2()};
+const _dash3=VIEWS.dash;
+VIEWS.dash=()=>`<button class="btn big" onclick="dvStart()">👥 دابل فيزت مع مندوب</button>`+_dash3();

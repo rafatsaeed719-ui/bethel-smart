@@ -186,7 +186,9 @@ function scheduleRender(){if(_rq)return;_rq=true;requestAnimationFrame(()=>{_rq=
  if(ae&&$('#main').contains(ae)&&/INPUT|TEXTAREA|SELECT/.test(ae.tagName)){ae.addEventListener('blur',scheduleRender,{once:true});return}render()})}
 
 const P=id=>S.products.find(p=>p.id===id)||{name:'؟',price:0};
-const Cu=id=>S.customers.find(c=>c.id===id)||{name:'؟'};
+const Cu=id=>S.customers.find(c=>c.id===id)||{name:(S.visits.concat(S.joint||[]).find(v=>v.cust===id&&v.cname)||{}).cname||'؟'};
+const allV=()=>S.joint&&S.joint.length?S.visits.concat(S.joint.filter(j=>!S.visits.some(v=>v.id===j.id))):S.visits;
+const mine=(v,rep)=>v.rep===rep||(v.with||[]).includes(rep);
 const R=id=>S.reps.find(r=>r.id===id)||{name:'؟',perms:{}};
 const isRep=()=>S.reps.some(r=>r.id===V.role);
 const isAcc=()=>S.accountants.some(a=>a.id===V.role);
@@ -195,8 +197,8 @@ const grpOf=()=>isRep()?'rep':isAcc()?'acc':V.role;
 const me=()=>R(V.role);
 const invState=i=>i.status==='paid'?'paid':(age(i.date)>=S.settings.dueDays?'due':'open');
 const STATE_PILL={paid:'<span class="pill ok">تم الدفع</span>',due:'<span class="pill bad">مستحقة</span>',open:'<span class="pill warn">مفتوحة</span>'};
-const visitsOn=(rep,date)=>S.visits.filter(v=>v.rep===rep&&v.date===date);
-const monthVisits=rep=>S.visits.filter(v=>v.rep===rep&&v.date.startsWith(MONTH));
+const visitsOn=(rep,date)=>allV().filter(v=>mine(v,rep)&&v.date===date);
+const monthVisits=rep=>allV().filter(v=>mine(v,rep)&&v.date.startsWith(MONTH));
 const sales=(rep,from,to)=>S.invoices.filter(i=>i.rep===rep&&i.date>=from&&i.date<=to).reduce((s,i)=>s+invTotal(i)-retValue(i),0);
 const collected=(rep,month)=>S.invoices.filter(i=>i.rep===rep&&i.status==='paid'&&(i.paidDate||'').startsWith(month)).reduce((s,i)=>s+i.collected,0);
 const custRule=cid=>S.custRules[cid]||{perMonth:S.settings.perMonth,gap:S.settings.gapDays};
@@ -264,7 +266,7 @@ function calendar(rep){
  return `<div class="cal">${h}</div>`}
 function visitRow(v,showRep){const c=Cu(v.cust);const rc={'طلب أوردر':'ok','مهتم':'acc','متابعة':'warn','غير مهتم':'bad'}[v.result]||'';
  return `<div class="item">${showRep?avatar(R(v.rep)):''}<div class="grow"><div class="row between"><span class="t">${esc(c.name)}</span><span class="pill ${rc}">${esc(v.result)}</span></div>
- <div class="d">${showRep?esc(R(v.rep).name)+' · ':''}${fmt(+v.time.split(':')[0])}:${v.time.split(':')[1]} · ${v.items.map(p=>esc(short(P(p).name))).join('، ')}</div>
+ ${(v.with||[]).length||v.rep!==V.role&&!showRep?`<div class="d" style="color:var(--accent);font-weight:600">👥 دابل فيزت: ${[v.rep,...(v.with||[])].filter(x=>x!==V.role||showRep).map(x=>esc(personName(x))).join(' و ')}</div>`:''}<div class="d">${showRep?esc(R(v.rep).name)+' · ':''}${fmt(+v.time.split(':')[0])}:${v.time.split(':')[1]} · ${v.items.map(p=>esc(short(P(p).name))).join('، ')}</div>
  ${v.talk?`<div class="d">${esc(v.talk)}</div>`:'<div class="d" style="color:var(--warn)">من غير محادثة</div>'}${v.order?`<div class="d">أوردر: ${v.order.map(o=>fmt(o.qty)+' '+esc(P(o.prod).name.split(' ')[0])).join('، ')}</div>`:''}</div></div>`}
 /* ============ OFFLINE QUEUE ============ */
 V.offline=typeof navigator!=='undefined'&&navigator.onLine===false;
@@ -688,7 +690,7 @@ function rowsInvSummary(){return filteredInv().map(i=>{const gross=i.lines.reduc
   'الإجمالي قبل الخصم':r2(gross),'قيمة الخصم':r2(gross-net),'الإجمالي بعد الخصم':r2(net),'قيمة المرتجع':r2(ret),'المطلوب':r2(due),'التحصيل':r2(i.collected||0),'الباقي':r2(i.status==='paid'?0:due),'حالة الفاتورة':STATUS_AR[invState(i)],'تاريخ التحصيل':i.paidDate||''}})}
 function rowsInvLines(){const out=[];filteredInv().forEach(i=>i.lines.forEach(l=>{const rq=(i.returns.find(r=>r.prod===l.prod)||{}).qty||0;
  out.push({'رقم الفاتورة':i.no,'تاريخ التنزيل':i.date,'الصيدلية':Cu(i.cust).name,'المندوب':R(i.rep).name,'الصنف':P(l.prod).name,'الكمية':l.qty,'السعر':l.price,'الخصم %':l.disc,'الإجمالي بعد الخصم':r2(lineTotal(l)),'كمية المرتجع':rq,'حالة الفاتورة':STATUS_AR[invState(i)]})}));return out}
-function rowsVisits(){return S.visits.filter(v=>inMonth(v.date)&&repOk(v.rep)).sort((a,b)=>a.date.localeCompare(b.date)||a.time.localeCompare(b.time)).map(v=>({'التاريخ':v.date,'الوقت':v.time,'المندوب':R(v.rep).name,'العميل':Cu(v.cust).name,'النوع':Cu(v.cust).type,'النتيجة':v.result,'الأصناف':v.items.map(p=>short(P(p).name)).join(' | '),'المحادثة':v.talk||'','الأوردر':(v.order||[]).map(o=>`${short(P(o.prod).name)} × ${o.qty}`).join(' | ')}))}
+function rowsVisits(){return S.visits.filter(v=>inMonth(v.date)&&(repOk(v.rep)||(v.with||[]).some(repOk))).sort((a,b)=>a.date.localeCompare(b.date)||a.time.localeCompare(b.time)).map(v=>({'التاريخ':v.date,'الوقت':v.time,'المندوب':R(v.rep).name,'العميل':Cu(v.cust).name,'النوع':Cu(v.cust).type,'النتيجة':v.result,'الأصناف':v.items.map(p=>short(P(p).name)).join(' | '),'المحادثة':v.talk||'','دابل فيزت مع':(v.with||[]).map(personName).join(' | '),'الأوردر':(v.order||[]).map(o=>`${short(P(o.prod).name)} × ${o.qty}`).join(' | ')}))}
 function rowsStaff(){const [ws,we]=weekRange();return S.reps.filter(r=>repOk(r.id)).map(r=>{let wd=0,worked=0,vac=0;
  for(let d=1;d<=+TODAY.slice(8);d++){const date=`${MONTH}-${pad(d)}`;if(dow(date)===5)continue;wd++;if(onVac(r.id,date)){vac++;continue}if(visitsOn(r.id,date).length)worked++}
  const ded=deductions(r.id);const mv=monthVisits(r.id).length;const sm=sales(r.id,MONTH+'-01',MONTH+'-31');
